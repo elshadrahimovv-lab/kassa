@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="az">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kassa</title>
+<meta name="theme-color" content="#0b0b0e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kassa">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<style>
+/* Layout: one phone-width column, bank-app style — big balance on top, dark cards, fixed 5-tab bar at the bottom, bottom sheets for input */
+:root{
+  --bg:#0b0b0e; --surface:#16161b; --surface-2:#202027; --line:#2b2b33;
+  --fg:#f3f3f6; --muted:#8e8e9a; --accent:#f0b43c; --accent-ink:#1a1407;
+  --income:#36c98b; --expense:#ff5f5f; --debt:#ff9f43; --save:#7fa8ff;
+  --font:"Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+body{margin:0;overscroll-behavior-y:none}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--bg)}
+img{max-width:100%}
+[hidden]{display:none!important}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--font);font-size:15px;-webkit-font-smoothing:antialiased;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;padding:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+.num{font-variant-numeric:tabular-nums}
+#app{max-width:480px;margin:0 auto;padding-block:12px 120px}
+.top{display:flex;align-items:center;justify-content:space-between;padding-block:6px 14px}
+.brand{font-weight:800;font-size:22px;letter-spacing:-.02em}
+.brand b{color:var(--accent)}
+.avatar{width:38px;height:38px;border-radius:50%;background:var(--surface-2);display:grid;place-items:center;font-weight:700;color:var(--muted)}
+h1{font-size:26px;font-weight:800;letter-spacing:-.02em;margin:0}
+h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:26px 0 10px}
+.sample{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface);border:1px dashed var(--line);border-radius:14px;padding:10px 14px;font-size:13px;color:var(--muted);margin-bottom:14px}
+.sample button{color:var(--accent);font-weight:700;font-size:13px}
+.hero{padding-block:8px 18px}
+.hero .lbl{color:var(--muted);font-size:14px;font-weight:600}
+.hero .big{font-size:42px;font-weight:800;letter-spacing:-.03em;margin-top:4px;line-height:1.1}
+.hero .sub{margin-top:8px;display:inline-flex;gap:6px;align-items:center;background:var(--surface);border-radius:99px;padding:6px 12px;font-size:13px;font-weight:600;color:var(--save)}
+.quick{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-block:6px 6px}
+.quick button{display:flex;flex-direction:column;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--muted)}
+.quick .ic{width:56px;height:56px;border-radius:50%;background:var(--surface-2);display:grid;place-items:center}
+.quick svg{width:24px;height:24px}
+.card{background:var(--surface);border-radius:20px;padding:16px}
+.stack{display:flex;flex-direction:column;gap:10px}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.split>div{min-width:0}
+.k{font-size:13px;color:var(--muted);font-weight:600}
+.v{font-size:20px;font-weight:800;margin-top:4px;letter-spacing:-.01em}
+.in{color:var(--income)} .out{color:var(--expense)} .dbt{color:var(--debt)} .sav{color:var(--save)}
+.cmp{margin-top:14px;display:grid;gap:8px}
+.cmp-row{display:grid;grid-template-columns:72px 1fr 84px;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.cmp-row .val{text-align:right;color:var(--fg);font-weight:600}
+.track{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.fill{height:100%;border-radius:99px}
+.alert{display:flex;gap:12px;align-items:center;background:var(--surface);border-radius:16px;padding:12px 14px;font-size:14px;line-height:1.35}
+.alert .dot{flex:none;width:10px;height:10px;border-radius:50%}
+.row{display:flex;align-items:center;gap:12px;padding:10px 0;width:100%;text-align:left}
+.row+.row{border-top:1px solid var(--line)}
+.tile{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-size:20px;background:var(--surface-2)}
+.row .mid{flex:1;min-width:0}
+.row .t{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .s{font-size:13px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .a{font-weight:700;white-space:nowrap}
+.linkbtn{color:var(--accent);font-weight:700;font-size:14px}
+.headrow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.headrow h2{margin:0}
+.sec{margin-top:26px}
+.sec>.headrow{margin-bottom:10px}
+.month{display:flex;align-items:center;gap:6px;background:var(--surface);border-radius:99px;padding:4px}
+.month button{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;color:var(--muted)}
+.month button:disabled{opacity:.3;cursor:default}
+.month span{font-weight:700;font-size:14px;min-width:96px;text-align:center}
+.donutwrap{display:grid;grid-template-columns:140px 1fr;gap:16px;align-items:center}
+.donutbox{position:relative;width:140px;height:140px}
+.donutbox svg{width:140px;height:140px;display:block}
+.donutbox .c{position:absolute;inset:0;display:grid;place-content:center;text-align:center;font-size:12px;color:var(--muted)}
+.donutbox .c b{display:block;color:var(--fg);font-size:13px;margin-top:2px;max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.legend{display:grid;gap:8px;min-width:0;font-size:13px}
+.legend div{display:grid;grid-template-columns:10px 1fr auto;gap:8px;align-items:center}
+.legend i{width:10px;height:10px;border-radius:3px}
+.legend span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.legend em{font-style:normal;color:var(--muted)}
+.lim{display:grid;gap:6px;padding:10px 0}
+.lim+.lim{border-top:1px solid var(--line)}
+.lim .top2{display:flex;justify-content:space-between;gap:8px;font-size:14px}
+.lim .top2 b{font-weight:700}
+.lim .top2 span{color:var(--muted)}
+.daylbl{font-size:13px;color:var(--muted);font-weight:700;margin:18px 0 2px}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--surface);border-radius:14px;padding:4px;margin-top:14px}
+.seg button{padding:10px;border-radius:11px;font-weight:700;font-size:14px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.person{display:block;width:100%;text-align:left}
+.person .p1{display:flex;align-items:center;gap:12px}
+.ini{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:17px}
+.person .p2{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted);margin-top:10px}
+.pill{display:inline-block;padding:3px 9px;border-radius:99px;font-size:12px;font-weight:700}
+.jar{display:block;width:100%;text-align:left}
+.jar .j1{display:flex;align-items:center;gap:12px}
+.jar .advice{margin-top:10px;font-size:13px;color:var(--muted);line-height:1.4}
+.empty{color:var(--muted);text-align:center;padding:28px 12px;font-size:14px;line-height:1.5}
+details.closed summary{cursor:pointer;color:var(--muted);font-weight:700;font-size:14px;padding:6px 0;list-style:none}
+details.closed summary::-webkit-details-marker{display:none}
+/* bottom nav */
+nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:color-mix(in srgb, var(--bg) 88%, transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);
+  padding:6px max(8px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px))}
+nav .in2{max-width:480px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
+nav button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;font-size:11px;font-weight:600;color:var(--muted)}
+nav svg{width:24px;height:24px}
+nav button[aria-current="page"]{color:var(--fg)}
+nav button[aria-current="page"] svg{color:var(--accent)}
+svg.i{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.fab{position:fixed;z-index:19;right:max(20px, calc((100vw - 480px)/2 + 20px));bottom:calc(84px + env(safe-area-inset-bottom, 0px));
+  height:54px;padding:0 20px 0 16px;border-radius:99px;background:var(--accent);color:var(--accent-ink);font-weight:800;display:flex;align-items:center;gap:6px;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.fab svg{width:22px;height:22px;stroke-width:2.6}
+/* sheet */
+#scrim{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.6);opacity:0;transition:opacity .2s}
+#scrim.open{opacity:1}
+#sheet{position:fixed;z-index:41;left:0;right:0;bottom:0;margin:0 auto;max-width:480px;max-height:90%;overflow:auto;background:var(--surface);border-radius:24px 24px 0 0;
+  padding:8px max(18px, env(safe-area-inset-right, 0px)) calc(22px + env(safe-area-inset-bottom, 0px)) max(18px, env(safe-area-inset-left, 0px));transform:translateY(100%);transition:transform .25s ease}
+#sheet.open{transform:none}
+.grab{width:40px;height:5px;border-radius:99px;background:var(--line);margin:4px auto 14px}
+#sheet h3{margin:0 0 14px;font-size:20px;font-weight:800}
+form{display:flex;flex-direction:column;gap:14px}
+.amount{display:flex;align-items:baseline;gap:8px;border-bottom:2px solid var(--line);padding-bottom:6px}
+.amount:focus-within{border-color:var(--accent)}
+.amount input{flex:1;min-width:0;background:none;border:0;outline:0;font-size:38px;font-weight:800;letter-spacing:-.02em}
+.amount span{font-size:28px;font-weight:800;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip input{position:absolute;opacity:0;pointer-events:none}
+.chip span{display:inline-block;padding:8px 12px;border-radius:99px;background:var(--surface-2);font-size:14px;font-weight:600;cursor:pointer;border:1.5px solid transparent}
+.chip input:checked+span{border-color:var(--accent);color:var(--accent)}
+.chip input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.field{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted);font-weight:600}
+.field input{background:var(--surface-2);border:1.5px solid transparent;border-radius:12px;padding:12px;font-size:16px;color:var(--fg);outline:0;min-width:0;width:100%}
+.field input:focus{border-color:var(--accent)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.toggle{display:flex;align-items:center;gap:10px;font-weight:600;font-size:14px}
+.toggle input{width:20px;height:20px;accent-color:var(--accent)}
+.btn{height:52px;border-radius:16px;font-weight:800;font-size:16px;background:var(--surface-2)}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.danger{background:none;color:var(--expense);height:44px;font-size:14px}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{display:flex;justify-content:space-between;gap:10px;font-size:14px;padding:6px 0}
+.stat span{color:var(--muted)}
+.toast{position:fixed;z-index:60;left:50%;bottom:calc(150px + env(safe-area-inset-bottom, 0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 18px;border-radius:99px;font-weight:700;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+@media (prefers-reduced-motion:reduce){#sheet,#scrim,.toast{transition:none}}
+@media (max-width:360px){.donutwrap{grid-template-columns:1fr;justify-items:center}.legend{width:100%}.hero .big{font-size:36px}}
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+<button class="fab" id="fab" hidden></button>
+<nav aria-label="Bölmələr"><div class="in2" id="nav"></div></nav>
+<div id="scrim" hidden data-act="close"></div>
+<div id="sheet" hidden role="dialog" aria-modal="true"><div class="grab"></div><div id="sheetBody"></div></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function(){
+const KEY='kassa.v1';
+const MON=['Yanvar','Fevral','Mart','Aprel','May','İyun','İyul','Avqust','Sentyabr','Oktyabr','Noyabr','Dekabr'];
+const ICONS={
+  home:'<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  in:'<path d="M12 4v12M6 10l6 6 6-6M5 20h14"/>',
+  out:'<path d="M12 20V8M6 14l6-6 6 6M5 4h14"/>',
+  debt:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M16 4.5a3.5 3.5 0 0 1 0 7M18 14c2.2.6 3.5 2.8 3.5 6"/>',
+  save:'<rect x="4.5" y="7.5" width="15" height="13" rx="3.5"/><path d="M8 3.5h8v4H8zM9 14h6"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  l:'<path d="M15 6l-6 6 6 6"/>', r:'<path d="M9 6l6 6-6 6"/>'
+};
+const svg=(n)=>`<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
+const CAT={
+  in:[{id:'maas',ic:'💼',n:'Maaş',c:'#36c98b'},{id:'frilans',ic:'💻',n:'Frilans',c:'#4fd1c5'},{id:'satis',ic:'🏷️',n:'Satış',c:'#7fa8ff'},{id:'hediyye',ic:'🎁',n:'Hədiyyə',c:'#f0b43c'},{id:'diger',ic:'➕',n:'Digər',c:'#8e8e9a'}],
+  out:[{id:'market',ic:'🛒',n:'Market',c:'#f0b43c'},{id:'yemek',ic:'🍔',n:'Yemək',c:'#ff7a59'},{id:'neqliyyat',ic:'🚕',n:'Nəqliyyat',c:'#7fa8ff'},{id:'kommunal',ic:'🏠',n:'Kommunal',c:'#b48cff'},{id:'telefon',ic:'📱',n:'Telefon/İnternet',c:'#4fd1c5'},{id:'geyim',ic:'👕',n:'Geyim',c:'#ff6fa8'},{id:'saglamliq',ic:'💊',n:'Sağlamlıq',c:'#9bd45b'},{id:'eylence',ic:'🎉',n:'Əyləncə',c:'#ffa94d'},{id:'diger',ic:'➕',n:'Digər',c:'#8e8e9a'}]
+};
+const JAR_IC=['🚗','✈️','🛡️','🏠','📱','🎓','💍','🎁','💰'];
+const cat=(k,id)=>CAT[k].find(c=>c.id===id)||CAT[k][CAT[k].length-1];
+
+/* dates */
+const pad=n=>String(n).padStart(2,'0');
+const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const NOW=new Date(); const TODAY=iso(NOW);
+const off=n=>{const d=new Date(NOW);d.setDate(d.getDate()+n);return iso(d)};
+const md=(m,day)=>{const d=new Date(NOW.getFullYear(),NOW.getMonth()+m,1);const dim=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();d.setDate(Math.min(day,dim));return iso(d)};
+const ym=(m)=>{const d=new Date(NOW.getFullYear(),NOW.getMonth()+m,1);return `${d.getFullYear()}-${pad(d.getMonth()+1)}`};
+const ymLabel=(m)=>{const d=new Date(NOW.getFullYear(),NOW.getMonth()+m,1);return `${MON[d.getMonth()]} ${d.getFullYear()}`};
+const parse=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const dayDiff=(a,b)=>Math.round((parse(a)-parse(b))/864e5);
+const dLabel=s=>{const k=dayDiff(TODAY,s);if(k===0)return 'Bu gün';if(k===1)return 'Dünən';const d=parse(s);return `${d.getDate()} ${MON[d.getMonth()].toLowerCase()}${d.getFullYear()!==NOW.getFullYear()?' '+d.getFullYear():''}`};
+const uid=()=>Math.random().toString(36).slice(2,10);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function fmt(n,sign){const neg=n<-0.004;const a=Math.abs(n);let [i,d]=a.toFixed(2).split('.');i=i.replace(/\B(?=(\d{3})+(?!\d))/g,' ');return (neg?'−':(sign&&a>0.004?'+':''))+i+(d!=='00'?','+d:'')+' ₼'}
+const num=v=>{const n=parseFloat(String(v||'').replace(/\s/g,'').replace(',','.'));return isFinite(n)?Math.round(n*100)/100:0};
+
+/* sample data (marked as examples in the UI) */
+function sample(){
+  const T=(kind,amt,c,date,note,recur)=>({id:uid(),kind,amt,cat:c,date,note:note||'',recur:!!recur});
+  const tx=[
+    T('in',800,'diger',md(-3,2),'Əvvəlki qalıq'),
+    T('in',1800,'maas',md(-3,1),'Əsas iş',true),
+    T('in',100,'hediyye',md(-2,14),'Ad günü'),
+    T('in',450,'frilans',md(-1,14),'Loqo sifarişi'),
+    T('in',120,'satis',md(-1,22),'Köhnə qulaqlıq'),
+    T('out',85,'kommunal',md(-3,1),'İşıq, qaz, su',true),
+    T('out',25,'telefon',md(-3,1),'Ev interneti',true),
+    T('out',180,'market',md(-3,9)),T('out',120,'yemek',md(-3,15)),T('out',60,'neqliyyat',md(-3,18)),T('out',90,'geyim',md(-3,24)),
+    T('out',210,'market',md(-2,7)),T('out',150,'yemek',md(-2,12)),T('out',70,'neqliyyat',md(-2,16)),T('out',80,'eylence',md(-2,20),'Kino'),T('out',40,'saglamliq',md(-2,26)),
+    T('out',62.4,'market',md(-1,3)),T('out',48,'yemek',md(-1,5)),T('out',140,'geyim',md(-1,8),'Gödəkçə'),T('out',55.9,'market',md(-1,11)),T('out',75,'neqliyyat',md(-1,13)),
+    T('out',64,'yemek',md(-1,17)),T('out',60,'eylence',md(-1,19),'Konsert'),T('out',58.3,'market',md(-1,21)),T('out',35,'saglamliq',md(-1,23),'Aptek'),T('out',68,'yemek',md(-1,26)),T('out',53.2,'market',md(-1,28)),T('out',15,'telefon',md(-1,28),'Mobil balans'),
+    T('out',64.3,'market',md(0,1),'Bazarlıq'),T('out',22,'yemek',md(0,1)),T('out',45,'eylence',md(0,1),'Bouling'),T('out',18.5,'yemek',TODAY,'Nahar'),T('out',6,'neqliyyat',TODAY,'Taksi')
+  ];
+  return {v:1,sample:true,tx,
+    limits:{total:1500,market:400,yemek:300,eylence:50},
+    debts:[
+      {id:uid(),dir:'in',name:'Rəşad',due:off(12),note:'Maşın təmiri üçün',ops:[{type:'loan',amt:500,date:md(-2,10)},{type:'pay',amt:200,date:md(-1,15)}]},
+      {id:uid(),dir:'in',name:'Nigar',due:off(-3),note:'',ops:[{type:'loan',amt:150,date:md(-1,20)}]},
+      {id:uid(),dir:'in',name:'Tural',due:md(-2,28),note:'',ops:[{type:'loan',amt:300,date:md(-3,8)},{type:'pay',amt:300,date:md(-2,25)}]},
+      {id:uid(),dir:'out',name:'Kamran',due:off(20),note:'Telefon üçün',ops:[{type:'loan',amt:400,date:md(-1,5)}]}
+    ],
+    jars:[
+      {id:uid(),name:'Maşın',ic:'🚗',goal:5000,due:md(14,1),ops:[{amt:500,date:md(-3,6)},{amt:400,date:md(-2,2)},{amt:300,date:md(-1,2)}]},
+      {id:uid(),name:'Səyahət',ic:'✈️',goal:1500,due:md(7,1),ops:[{amt:300,date:md(-2,3)},{amt:300,date:md(-1,3)}]},
+      {id:uid(),name:'Təcili hallar',ic:'🛡️',goal:0,due:'',ops:[{amt:500,date:md(-3,7)}]}
+    ]};
+}
+let S=null;
+try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!S||S.v!==1)S=sample();
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+
+/* monthly repeats: a template with recur:true gets one copy per following month */
+function applyRecurring(){
+  S.tx.filter(t=>t.recur).forEach(t=>{
+    const day=parse(t.date).getDate();
+    for(let m=-36;m<=0;m++){
+      const date=md(m,day);
+      if(date<=t.date.slice(0,7)+'-31'||date>TODAY)continue;
+      const key=date.slice(0,7);
+      if(!S.tx.some(x=>x.recurOf===t.id&&x.date.slice(0,7)===key))
+        S.tx.push({...t,id:uid(),date,recur:false,recurOf:t.id});
+    }
+  });
+}
+applyRecurring();save();
+
+/* derived numbers */
+const jarSum=j=>j.ops.reduce((s,o)=>s+o.amt,0);
+const debtLoan=d=>d.ops.filter(o=>o.type==='loan').reduce((s,o)=>s+o.amt,0);
+const debtPaid=d=>d.ops.filter(o=>o.type==='pay').reduce((s,o)=>s+o.amt,0);
+const debtLeft=d=>Math.round((debtLoan(d)-debtPaid(d))*100)/100;
+const isOpen=d=>debtLeft(d)>0.004;
+function totals(){
+  let b=0;S.tx.forEach(t=>b+=t.kind==='in'?t.amt:-t.amt);
+  S.debts.forEach(d=>d.ops.forEach(o=>{const s=(d.dir==='in')===(o.type==='loan')?-1:1;b+=s*o.amt}));
+  const saved=S.jars.reduce((s,j)=>s+jarSum(j),0);
+  const owedToMe=S.debts.filter(d=>d.dir==='in').reduce((s,d)=>s+Math.max(debtLeft(d),0),0);
+  const iOwe=S.debts.filter(d=>d.dir==='out').reduce((s,d)=>s+Math.max(debtLeft(d),0),0);
+  return {bal:b-saved,saved,owedToMe,iOwe};
+}
+const monthTx=(kind,m)=>S.tx.filter(t=>t.kind===kind&&t.date.slice(0,7)===ym(m));
+const sum=a=>a.reduce((s,t)=>s+t.amt,0);
+function limitRows(){
+  const spent=monthTx('out',0);const rows=[];
+  Object.entries(S.limits).forEach(([k,lim])=>{
+    if(!lim)return;
+    const used=k==='total'?sum(spent):sum(spent.filter(t=>t.cat===k));
+    rows.push({k,lim,used,p:used/lim,name:k==='total'?'Ümumi aylıq':cat('out',k).n,ic:k==='total'?'Σ':cat('out',k).ic});
+  });
+  return rows.sort((a,b)=>(a.k==='total'?-1:b.k==='total'?1:b.p-a.p));
+}
+const levelColor=p=>p>=1?'var(--expense)':p>=.8?'var(--debt)':'var(--income)';
+
+/* UI state */
+let tab='home',mOff={in:0,out:0},debtDir='in';
+
+function feed(){
+  const f=[];
+  S.tx.forEach(t=>{const c=cat(t.kind,t.cat);f.push({date:t.date,ic:c.ic,t:t.note||c.n,s:c.n,amt:t.kind==='in'?t.amt:-t.amt,act:'tx:'+t.id})});
+  S.debts.forEach(d=>d.ops.forEach(o=>{const giveOut=(d.dir==='in')===(o.type==='loan');
+    f.push({date:o.date,ic:d.dir==='in'?'🤝':'🧾',t:d.name,s:d.dir==='in'?(o.type==='loan'?'Borc verdim':'Borcu qaytardı'):(o.type==='loan'?'Borc aldım':'Borcumu qaytardım'),amt:giveOut?-o.amt:o.amt,act:'debt:'+d.id})}));
+  S.jars.forEach(j=>j.ops.forEach(o=>f.push({date:o.date,ic:j.ic,t:j.name,s:o.amt>0?'Ehtiyata qoydum':'Ehtiyatdan götürdüm',amt:-o.amt,act:'jar:'+j.id,save:true})));
+  return f.sort((a,b)=>b.date.localeCompare(a.date));
+}
+const rowHTML=x=>`<button class="row" data-act="${x.act}"><span class="tile">${x.ic}</span><span class="mid"><div class="t">${esc(x.t)}</div><div class="s">${esc(x.s)} · ${dLabel(x.date)}</div></span><span class="a num ${x.save?'sav':x.amt>0?'in':''}">${fmt(x.amt,true)}</span></button>`;
+
+function alerts(){
+  const a=[];
+  limitRows().forEach(r=>{if(r.p>=1)a.push({c:'var(--expense)',t:`${r.name} limiti keçilib: ${fmt(r.used)} / ${fmt(r.lim)}`});else if(r.p>=.8)a.push({c:'var(--debt)',t:`${r.name} limitinin ${Math.round(r.p*100)}%-i xərclənib`})});
+  S.debts.filter(isOpen).forEach(d=>{if(!d.due)return;const k=dayDiff(TODAY,d.due);
+    if(k>0)a.push({c:'var(--expense)',t:d.dir==='in'?`${esc(d.name)} borcu qaytarmalı idi (${k} gün gecikir)`:`${esc(d.name)} adlı şəxsə borcun gecikir (${k} gün)`});
+    else if(k>=-3)a.push({c:'var(--debt)',t:d.dir==='in'?`${esc(d.name)} ${k===0?'bu gün':(-k)+' gün sonra'} borcu qaytarmalıdır`:`${esc(d.name)} adlı şəxsə borcunu ${k===0?'bu gün':(-k)+' gün sonra'} qaytarmalısan`})});
+  return a;
+}
+
+/* screens */
+function home(){
+  const T=totals();const ti=sum(monthTx('in',0)),to=sum(monthTx('out',0)),li=sum(monthTx('in',-1)),lo=sum(monthTx('out',-1));
+  const mx=Math.max(ti,to,li,lo,1);const al=alerts();const f=feed().slice(0,5);
+  return `<div class="top"><div class="brand">Kassa<b>.</b></div><div class="avatar" aria-hidden="true">E</div></div>
+  ${S.sample?`<div class="sample"><span>Nümunə məlumatlar göstərilir</span><button data-act="clear">Təmizlə və başla</button></div>`:''}
+  <section class="hero"><div class="lbl">İstifadə edilə bilən balans</div><div class="big num">${fmt(T.bal)}</div>
+    <button class="sub num" data-act="tab:save">+ Ehtiyatda: ${fmt(T.saved)}</button></section>
+  <div class="quick">
+    <button data-act="add:in"><span class="ic in">${svg('in')}</span>Gəlir</button>
+    <button data-act="add:out"><span class="ic out">${svg('out')}</span>Xərc</button>
+    <button data-act="add:debt"><span class="ic dbt">${svg('debt')}</span>Borc</button>
+    <button data-act="add:jarquick"><span class="ic sav">${svg('save')}</span>Ehtiyata qoy</button>
+  </div>
+  <div class="sec"><div class="headrow"><h2>Bu ay · ${ymLabel(0)}</h2></div>
+  <div class="card"><div class="split"><div><div class="k">Gəlir</div><div class="v in num">${fmt(ti,true)}</div></div><div><div class="k">Xərc</div><div class="v out num">${fmt(-to)}</div></div></div>
+    <div class="cmp">
+      <div class="cmp-row"><span>Bu ay</span><div style="display:grid;gap:3px"><div class="track"><div class="fill" style="width:${ti/mx*100}%;background:var(--income)"></div></div><div class="track"><div class="fill" style="width:${to/mx*100}%;background:var(--expense)"></div></div></div><span class="val num">${fmt(ti-to,true)}</span></div>
+      <div class="cmp-row"><span>Keçən ay</span><div style="display:grid;gap:3px"><div class="track"><div class="fill" style="width:${li/mx*100}%;background:var(--income);opacity:.5"></div></div><div class="track"><div class="fill" style="width:${lo/mx*100}%;background:var(--expense);opacity:.5"></div></div></div><span class="val num">${fmt(li-lo,true)}</span></div>
+    </div></div></div>
+  ${al.length?`<div class="sec"><div class="headrow"><h2>Diqqət</h2></div><div class="stack">${al.map(x=>`<div class="alert"><span class="dot" style="background:${x.c}"></span><span>${x.t}</span></div>`).join('')}</div></div>`:''}
+  <div class="sec"><div class="headrow"><h2>Son əməliyyatlar</h2>${f.length?'<button class="linkbtn" data-act="all">Hamısı</button>':''}</div>
+  <div class="card" style="padding-block:4px">${f.length?f.map(rowHTML).join(''):'<div class="empty">Hələ əməliyyat yoxdur. Yuxarıdakı düymələrlə ilk gəliri və ya xərci əlavə et.</div>'}</div></div>`;
+}
+
+function donut(parts,total){
+  const r=54,C=2*Math.PI*r;let o=0;
+  const segs=parts.map(p=>{const len=p.v/total*C;const s=`<circle r="${r}" cx="70" cy="70" fill="none" stroke="${p.c}" stroke-width="18" stroke-dasharray="${Math.max(len-(parts.length>1?2:0),.1)} ${C}" stroke-dashoffset="${-o}" transform="rotate(-90 70 70)"/>`;o+=len;return s}).join('');
+  return `<svg viewBox="0 0 140 140" aria-hidden="true"><circle r="${r}" cx="70" cy="70" fill="none" stroke="var(--surface-2)" stroke-width="18"/>${segs}</svg>`;
+}
+
+function listScreen(kind){
+  const m=mOff[kind];const items=monthTx(kind,m).sort((a,b)=>b.date.localeCompare(a.date)||0);const total=sum(items);
+  const by={};items.forEach(t=>by[t.cat]=(by[t.cat]||0)+t.amt);
+  const parts=Object.entries(by).map(([id,v])=>({...cat(kind,id),v})).sort((a,b)=>b.v-a.v);
+  const title=kind==='in'?'Gəlirlər':'Xərclər';
+  let groups='';let last='';
+  items.forEach(t=>{if(t.date!==last){groups+=(last?'</div>':'')+`<div class="daylbl">${dLabel(t.date)}</div><div class="card" style="padding-block:4px">`;last=t.date}
+    const c=cat(kind,t.cat);groups+=rowHTML({date:t.date,ic:c.ic,t:t.note||c.n,s:c.n+(t.recur||t.recurOf?' · hər ay':''),amt:kind==='in'?t.amt:-t.amt,act:'tx:'+t.id})});
+  if(last)groups+='</div>';
+  let lim='';
+  if(kind==='out'&&m===0){const rows=limitRows();
+    lim=`<div class="sec"><div class="headrow"><h2>Limitlər</h2><button class="linkbtn" data-act="limit">${rows.length?'Dəyiş':'Limit qoy'}</button></div>
+    <div class="card" style="padding-block:6px">${rows.length?rows.map(r=>`<button class="lim" data-act="limit:${r.k}" style="width:100%;text-align:left"><div class="top2"><b>${r.ic} ${esc(r.name)}</b><span class="num">${fmt(r.used)} / ${fmt(r.lim)}</span></div><div class="track"><div class="fill" style="width:${Math.min(r.p,1)*100}%;background:${levelColor(r.p)}"></div></div></button>`).join(''):'<div class="empty">Kateqoriyalara aylıq limit qoy. 80%-ə çatanda xəbərdarlıq görəcəksən.</div>'}</div></div>`}
+  return `<div class="top"><h1>${title}</h1><div class="month"><button data-act="m:${kind}:-1" aria-label="Əvvəlki ay">${svg('l')}</button><span>${ymLabel(m)}</span><button data-act="m:${kind}:1" aria-label="Növbəti ay" ${m>=0?'disabled':''}>${svg('r')}</button></div></div>
+  <section class="hero"><div class="lbl">${kind==='in'?'Ayın ümumi gəliri':'Ayın ümumi xərci'}</div><div class="big num ${kind==='in'?'in':''}">${fmt(kind==='in'?total:-total,kind==='in')}</div></section>
+  ${parts.length?`<div class="card donutwrap"><div class="donutbox">${donut(parts,total)}<div class="c">Ən çox · ${Math.round(parts[0].v/total*100)}%<b>${esc(parts[0].n)}</b></div></div>
+  <div class="legend">${parts.map(p=>`<div><i style="background:${p.c}"></i><span>${p.ic} ${esc(p.n)}</span><em class="num">${fmt(p.v)}</em></div>`).join('')}</div></div>`:''}
+  ${lim}
+  <div class="sec"><div class="headrow"><h2>Əməliyyatlar</h2></div>${groups||`<div class="card empty">Bu ay üçün ${kind==='in'?'gəlir':'xərc'} yoxdur. Aşağıdakı “+” düyməsi ilə əlavə et.</div>`}</div>`;
+}
+
+function debtCard(d){
+  const left=debtLeft(d),loan=debtLoan(d),paid=debtPaid(d),p=loan?paid/loan:0;
+  const k=d.due?dayDiff(TODAY,d.due):null;const late=isOpen(d)&&k!==null&&k>0;
+  const col=d.dir==='in'?'var(--debt)':'var(--expense)';
+  const pill=!isOpen(d)?`<span class="pill" style="background:var(--surface-2);color:var(--income)">Bağlanıb</span>`:late?`<span class="pill" style="background:var(--expense);color:var(--bg)">${k} gün gecikir</span>`:d.due?`<span>Son tarix: ${dLabel(d.due)}</span>`:'<span>Tarix yoxdur</span>';
+  return `<button class="card person" data-act="debt:${d.id}"><div class="p1"><span class="ini" style="background:color-mix(in srgb, ${col} 20%, transparent);color:${col}">${esc(d.name.slice(0,1).toUpperCase())}</span>
+  <span class="mid" style="flex:1;min-width:0"><div style="font-weight:700">${esc(d.name)}</div><div style="font-size:13px;color:var(--muted);margin-top:2px">${d.note?esc(d.note):(d.dir==='in'?'Mənə borcludur':'Mən borcluyam')}</div></span>
+  <span style="text-align:right"><div class="num" style="font-weight:800;font-size:17px;color:${isOpen(d)?col:'var(--muted)'}">${fmt(Math.max(left,0))}</div><div style="font-size:12px;color:var(--muted)">qalıq</div></span></div>
+  <div class="track" style="margin-top:12px"><div class="fill" style="width:${Math.min(p,1)*100}%;background:var(--income)"></div></div>
+  <div class="p2"><span class="num">Qaytarılıb ${fmt(paid)} / ${fmt(loan)}</span>${pill}</div></button>`;
+}
+function debts(){
+  const T=totals();const list=S.debts.filter(d=>d.dir===debtDir);
+  const open=list.filter(isOpen).sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));const closed=list.filter(d=>!isOpen(d));
+  return `<div class="top"><h1>Borclar</h1></div>
+  <div class="split"><div class="card"><div class="k">Mənə borclular</div><div class="v dbt num">${fmt(T.owedToMe)}</div></div><div class="card"><div class="k">Mənim borcum</div><div class="v out num">${fmt(T.iOwe)}</div></div></div>
+  <div class="seg" role="group"><button data-act="dir:in" aria-pressed="${debtDir==='in'}">Mənə borclular</button><button data-act="dir:out" aria-pressed="${debtDir==='out'}">Mənim borclarım</button></div>
+  <div class="sec stack" style="margin-top:14px">${open.length?open.map(debtCard).join(''):`<div class="card empty">${debtDir==='in'?'Sənə borclu olan yoxdur.':'Heç kimə borcun yoxdur.'} Yeni qeyd üçün “+ Borc” düyməsini bas.</div>`}</div>
+  ${closed.length?`<details class="closed sec"><summary>Bağlanıb (${closed.length}) ▾</summary><div class="stack" style="margin-top:10px">${closed.map(debtCard).join('')}</div></details>`:''}`;
+}
+function jarAdvice(j){
+  const s=jarSum(j);if(!j.goal)return '';
+  if(s>=j.goal)return '🎉 Hədəfə çatdın!';
+  if(!j.due)return `Hədəfə ${fmt(j.goal-s)} qalıb.`;
+  const a=parse(TODAY),b=parse(j.due);const months=Math.max((b.getFullYear()-a.getFullYear())*12+b.getMonth()-a.getMonth(),1);
+  return `Hədəfə çatmaq üçün ayda <b class="num">${fmt((j.goal-s)/months)}</b> yığmalısan (${months} ay qalıb).`;
+}
+function savings(){
+  const T=totals();
+  return `<div class="top"><h1>Ehtiyat</h1></div>
+  <section class="hero"><div class="lbl">Ümumi ehtiyat</div><div class="big num sav">${fmt(T.saved)}</div></section>
+  <div class="stack">${S.jars.length?S.jars.map(j=>{const s=jarSum(j),p=j.goal?s/j.goal:0;
+    return `<button class="card jar" data-act="jar:${j.id}"><div class="j1"><span class="tile">${j.ic}</span><span style="flex:1;min-width:0"><div style="font-weight:700">${esc(j.name)}</div><div style="font-size:13px;color:var(--muted);margin-top:2px">${j.goal?`Məqsəd: ${fmt(j.goal)}${j.due?' · '+dLabel(j.due):''}`:'Məqsədsiz yığım'}</div></span>
+    <span style="text-align:right"><div class="num sav" style="font-weight:800;font-size:17px">${fmt(s)}</div>${j.goal?`<div style="font-size:12px;color:var(--muted)">${Math.round(p*100)}%</div>`:''}</span></div>
+    ${j.goal?`<div class="track" style="margin-top:12px"><div class="fill" style="width:${Math.min(p,1)*100}%;background:var(--save)"></div></div><div class="advice">${jarAdvice(j)}</div>`:''}</button>`}).join(''):'<div class="card empty">Hələ qutu yoxdur. “+ Qutu” ilə ilk məqsədini yarat, məsələn “Maşın, 5000 ₼”.</div>'}</div>`;
+}
+
+const TABS=[['home','Əsas','home'],['in','Gəlir','in'],['out','Xərc','out'],['debt','Borclar','debt'],['save','Ehtiyat','save']];
+const FAB={in:['add:in','Gəlir'],out:['add:out','Xərc'],debt:['add:debt','Borc'],save:['add:jar','Qutu']};
+function render(){
+  const app=document.getElementById('app');
+  app.innerHTML=tab==='home'?home():tab==='in'?listScreen('in'):tab==='out'?listScreen('out'):tab==='debt'?debts():savings();
+  document.getElementById('nav').innerHTML=TABS.map(([k,l,i])=>`<button data-act="tab:${k}" ${tab===k?'aria-current="page"':''}>${svg(i)}${l}</button>`).join('');
+  const fab=document.getElementById('fab');
+  if(FAB[tab]){fab.hidden=false;fab.dataset.act=FAB[tab][0];fab.innerHTML=svg('plus')+FAB[tab][1]}else fab.hidden=true;
+}
+
+/* sheets */
+const scrim=document.getElementById('scrim'),sheet=document.getElementById('sheet'),body=document.getElementById('sheetBody');
+let lastFocus=null;
+function open(html){lastFocus=document.activeElement;body.innerHTML=html;scrim.hidden=false;sheet.hidden=false;sheet.scrollTop=0;
+  requestAnimationFrame(()=>{scrim.classList.add('open');sheet.classList.add('open')});
+  const f=body.querySelector('[autofocus]');if(f)setTimeout(()=>f.focus(),260)}
+function close(){scrim.classList.remove('open');sheet.classList.remove('open');setTimeout(()=>{scrim.hidden=true;sheet.hidden=true;body.innerHTML=''},230);if(lastFocus&&lastFocus.focus)lastFocus.focus()}
+function toast(t){const el=document.getElementById('toast');el.textContent=t;el.classList.add('show');clearTimeout(toast.h);toast.h=setTimeout(()=>el.classList.remove('show'),1800)}
+const amountField=(ph)=>`<label class="amount"><input id="f-amt" name="amt" inputmode="decimal" placeholder="${ph||'0'}" autocomplete="off" required autofocus aria-label="Məbləğ"><span>₼</span></label>`;
+const chips=(name,list,sel)=>`<div class="chips">${list.map((c,i)=>`<label class="chip"><input type="radio" name="${name}" value="${c.id}" ${(sel?c.id===sel:i===0)?'checked':''}><span>${c.ic} ${esc(c.n)}</span></label>`).join('')}</div>`;
+
+function txForm(kind){
+  open(`<h3>${kind==='in'?'Yeni gəlir':'Yeni xərc'}</h3><form data-form="tx" data-kind="${kind}">${amountField()}${chips('cat',CAT[kind])}
+  <div class="grid2"><label class="field">Tarix<input type="date" id="f-date" name="date" value="${TODAY}" max="${TODAY}" required></label><label class="field">Qeyd<input id="f-note" name="note" placeholder="İstəyə bağlı" maxlength="60"></label></div>
+  <label class="toggle"><input type="checkbox" name="recur" id="f-recur">Hər ay təkrarla${kind==='in'?' (məs. maaş)':' (məs. kirayə)'}</label>
+  <button class="btn primary">Yadda saxla</button></form>`);
+}
+function txDetail(id){
+  const t=S.tx.find(x=>x.id===id);if(!t)return;const c=cat(t.kind,t.cat);
+  open(`<h3>${c.ic} ${esc(t.note||c.n)}</h3><div class="big num ${t.kind==='in'?'in':'out'}" style="font-size:34px;font-weight:800">${fmt(t.kind==='in'?t.amt:-t.amt,true)}</div>
+  <div style="margin:14px 0"><div class="stat"><span>Kateqoriya</span><b>${esc(c.n)}</b></div><div class="stat"><span>Tarix</span><b>${dLabel(t.date)}</b></div>${t.recur||t.recurOf?'<div class="stat"><span>Təkrar</span><b>Hər ay</b></div>':''}</div>
+  ${t.recur?`<button class="btn" style="width:100%;margin-bottom:8px" data-act="stoprecur:${t.id}">Təkrarı dayandır</button>`:''}
+  <button class="btn danger" style="width:100%" data-act="deltx:${t.id}">Bu qeydi sil</button>`);
+}
+function debtForm(pre){
+  const names=[...new Set(S.debts.map(d=>d.name))];
+  open(`<h3>Yeni borc</h3><form data-form="debt"><div class="seg" role="radiogroup" style="margin-top:0">
+    <label class="chip" style="display:contents"><input type="radio" name="dir" value="in" ${debtDir==='in'?'checked':''}><span style="text-align:center">Borc verdim</span></label>
+    <label class="chip" style="display:contents"><input type="radio" name="dir" value="out" ${debtDir==='out'?'checked':''}><span style="text-align:center">Borc aldım</span></label></div>
+  ${amountField()}
+  <label class="field">Kim?<input id="f-name" name="name" list="names" required placeholder="Ad" maxlength="40" value="${esc(pre||'')}"></label><datalist id="names">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
+  <div class="grid2"><label class="field">Tarix<input type="date" id="f-date" name="date" value="${TODAY}" max="${TODAY}" required></label><label class="field">Qaytarma tarixi<input type="date" id="f-due" name="due" min="${TODAY}"></label></div>
+  <label class="field">Qeyd<input id="f-note" name="note" placeholder="Nə üçün?" maxlength="60"></label>
+  <button class="btn primary">Yadda saxla</button></form>`);
+}
+function debtDetail(id){
+  const d=S.debts.find(x=>x.id===id);if(!d)return;const left=debtLeft(d);
+  const ops=[...d.ops].sort((a,b)=>b.date.localeCompare(a.date));
+  open(`<h3>${esc(d.name)}</h3><div class="k">${d.dir==='in'?'Mənə borcludur':'Mən borcluyam'}${d.note?' · '+esc(d.note):''}</div>
+  <div class="num" style="font-size:34px;font-weight:800;margin-top:6px;color:${isOpen(d)?(d.dir==='in'?'var(--debt)':'var(--expense)'):'var(--income)'}">${isOpen(d)?fmt(left):'Bağlanıb ✓'}</div>
+  <div style="margin:10px 0 16px"><div class="stat"><span>Ümumi borc</span><b class="num">${fmt(debtLoan(d))}</b></div><div class="stat"><span>Qaytarılıb</span><b class="num in">${fmt(debtPaid(d))}</b></div>${d.due?`<div class="stat"><span>Qaytarma tarixi</span><b>${dLabel(d.due)}</b></div>`:''}</div>
+  <form data-form="debtop" data-id="${d.id}">${amountField(isOpen(d)?String(left).replace('.',','):'0')}
+  <div class="btns"><button class="btn primary" name="op" value="pay" ${isOpen(d)?'':'disabled'}>Ödəniş əlavə et</button><button class="btn" name="op" value="loan">${d.dir==='in'?'Yenə borc ver':'Yenə borc al'}</button></div></form>
+  <h2>Tarixçə</h2><div>${ops.map(o=>`<div class="row"><span class="tile">${o.type==='loan'?'↗':'↙'}</span><span class="mid"><div class="t">${o.type==='loan'?(d.dir==='in'?'Borc verdim':'Borc aldım'):(d.dir==='in'?'Qaytardı':'Qaytardım')}</div><div class="s">${dLabel(o.date)}</div></span><span class="a num ${o.type==='pay'?'in':''}">${fmt(o.amt)}</span></div>`).join('')}</div>
+  <button class="btn danger" style="width:100%;margin-top:10px" data-act="deldebt:${d.id}">Bu borcu sil</button>`);
+}
+function jarForm(){
+  open(`<h3>Yeni qutu</h3><form data-form="jar"><label class="field">Ad<input id="f-name" name="name" required placeholder="məs. Maşın" maxlength="30" autofocus></label>
+  <div class="chips">${JAR_IC.map((ic,i)=>`<label class="chip"><input type="radio" name="ic" value="${ic}" ${i===0?'checked':''}><span style="font-size:20px;padding:6px 10px">${ic}</span></label>`).join('')}</div>
+  <div class="grid2"><label class="field">Məqsəd (₼)<input id="f-goal" name="goal" inputmode="decimal" placeholder="İstəyə bağlı"></label><label class="field">Hədəf tarixi<input type="date" id="f-due" name="due" min="${TODAY}"></label></div>
+  <button class="btn primary">Qutunu yarat</button></form>`);
+}
+function jarDetail(id){
+  const j=S.jars.find(x=>x.id===id);if(!j)return;const s=jarSum(j);
+  open(`<h3>${j.ic} ${esc(j.name)}</h3><div class="num sav" style="font-size:34px;font-weight:800">${fmt(s)}</div>
+  ${j.goal?`<div class="k" style="margin-top:4px">Məqsəd: ${fmt(j.goal)} · ${Math.round(s/j.goal*100)}%</div><div class="track" style="margin-top:10px"><div class="fill" style="width:${Math.min(s/j.goal,1)*100}%;background:var(--save)"></div></div><div class="advice" style="margin-top:10px;font-size:13px;color:var(--muted)">${jarAdvice(j)}</div>`:''}
+  <form data-form="jarop" data-id="${j.id}" style="margin-top:16px">${amountField()}<div class="btns"><button class="btn primary" name="op" value="put">Pul qoy</button><button class="btn" name="op" value="take">Pul götür</button></div></form>
+  <h2>Tarixçə</h2><div>${[...j.ops].sort((a,b)=>b.date.localeCompare(a.date)).map(o=>`<div class="row"><span class="tile">${o.amt>0?'↓':'↑'}</span><span class="mid"><div class="t">${o.amt>0?'Qoydum':'Götürdüm'}</div><div class="s">${dLabel(o.date)}</div></span><span class="a num ${o.amt>0?'sav':''}">${fmt(o.amt,true)}</span></div>`).join('')||'<div class="empty">Hələ əməliyyat yoxdur.</div>'}</div>
+  <button class="btn danger" style="width:100%;margin-top:10px" data-act="deljar:${j.id}">Qutunu sil</button>`);
+}
+function jarQuick(){
+  if(!S.jars.length){jarForm();return}
+  open(`<h3>Ehtiyata qoy</h3><form data-form="jarquick">${amountField()}${chips('jar',S.jars.map(j=>({id:j.id,ic:j.ic,n:j.name})))}<button class="btn primary">Qoy</button></form>`);
+}
+function limitForm(pre){
+  const list=[{id:'total',ic:'Σ',n:'Ümumi aylıq'},...CAT.out.filter(c=>c.id!=='diger')];
+  open(`<h3>Aylıq limit</h3><form data-form="limit">${chips('cat',list,pre||'total')}${amountField()}
+  <div class="k" style="font-weight:500">Limiti silmək üçün 0 yaz. 80%-ə çatanda və limit keçiləndə Ana səhifədə xəbərdarlıq görünəcək.</div>
+  <button class="btn primary">Yadda saxla</button></form>`);
+  const inp=body.querySelector('#f-amt');const set=()=>{const v=S.limits[body.querySelector('input[name=cat]:checked').value];inp.value=v?String(v).replace('.',','):''};set();
+  body.querySelectorAll('input[name=cat]').forEach(r=>r.addEventListener('change',set));
+}
+function allFeed(){
+  const f=feed();let h='',last='';
+  f.forEach(x=>{if(x.date!==last){h+=`<div class="daylbl">${dLabel(x.date)}</div>`;last=x.date}h+=rowHTML(x)});
+  open(`<h3>Bütün əməliyyatlar</h3>${h}`);
+}
+/* a confirm step inside the sheet, since browser dialogs are unavailable */
+function confirmDel(text,act){open(`<h3>${text}</h3><div class="k" style="margin-bottom:16px">Bu əməliyyat geri qaytarılmır.</div><div class="btns"><button class="btn" data-act="close">Ləğv et</button><button class="btn primary" style="background:var(--expense);color:var(--bg)" data-act="${act}">Sil</button></div>`)}
+
+/* events */
+document.addEventListener('click',e=>{
+  const el=e.target.closest('[data-act]');if(!el)return;
+  const [a,b,c]=el.dataset.act.split(':');
+  const go=t=>{tab=t;close();render();window.scrollTo(0,0)};
+  switch(a){
+    case 'tab':go(b);break;
+    case 'close':close();break;
+    case 'add':b==='in'||b==='out'?txForm(b):b==='debt'?debtForm():b==='jar'?jarForm():jarQuick();break;
+    case 'tx':txDetail(b);break;
+    case 'debt':debtDetail(b);break;
+    case 'jar':jarDetail(b);break;
+    case 'limit':limitForm(b);break;
+    case 'all':allFeed();break;
+    case 'm':mOff[b]=Math.min(0,mOff[b]+Number(c));render();break;
+    case 'dir':debtDir=b;render();break;
+    case 'clear':confirmDel('Nümunə məlumatlar silinsin?','doclear');break;
+    case 'doclear':S={v:1,sample:false,tx:[],limits:{},debts:[],jars:[]};save();close();render();toast('Təmiz başlanğıc');break;
+    case 'deltx':confirmDel('Qeyd silinsin?','dodeltx:'+b);break;
+    case 'dodeltx':S.tx=S.tx.filter(t=>t.id!==b);save();close();render();toast('Silindi');break;
+    case 'stoprecur':{const t=S.tx.find(x=>x.id===b);if(t)t.recur=false;save();close();render();toast('Təkrar dayandırıldı');break}
+    case 'deldebt':confirmDel('Borc silinsin?','dodeldebt:'+b);break;
+    case 'dodeldebt':S.debts=S.debts.filter(d=>d.id!==b);save();close();render();toast('Silindi');break;
+    case 'deljar':confirmDel('Qutu silinsin?','dodeljar:'+b);break;
+    case 'dodeljar':S.jars=S.jars.filter(j=>j.id!==b);save();close();render();toast('Silindi');break;
+  }
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!sheet.hidden)close()});
+document.addEventListener('submit',e=>{
+  e.preventDefault();const f=e.target,fd=new FormData(f),type=f.dataset.form;
+  const op=(e.submitter&&e.submitter.value)||'';
+  const amt=num(fd.get('amt'));
+  if(type!=='jar'&&type!=='limit'&&!(amt>0)){toast('Məbləği yaz');return}
+  if(type==='tx'){S.tx.push({id:uid(),kind:f.dataset.kind,amt,cat:fd.get('cat'),date:fd.get('date')||TODAY,note:(fd.get('note')||'').trim(),recur:!!fd.get('recur')});
+    const k=f.dataset.kind;mOff[k]=0;toast(k==='in'?'Gəlir əlavə olundu':'Xərc əlavə olundu')}
+  else if(type==='debt'){const dir=fd.get('dir'),name=(fd.get('name')||'').trim(),date=fd.get('date')||TODAY;
+    let d=S.debts.find(x=>x.dir===dir&&x.name.toLowerCase()===name.toLowerCase()&&isOpen(x));
+    if(d){d.ops.push({type:'loan',amt,date});if(fd.get('due'))d.due=fd.get('due')}
+    else S.debts.push({id:uid(),dir,name,due:fd.get('due')||'',note:(fd.get('note')||'').trim(),ops:[{type:'loan',amt,date}]});
+    debtDir=dir;toast(d?'Borc karta əlavə olundu':'Borc yazıldı')}
+  else if(type==='debtop'){const d=S.debts.find(x=>x.id===f.dataset.id);const o=op||'pay';
+    if(o==='pay'&&amt>debtLeft(d)+0.004){toast('Qalıqdan çox ola bilməz');return}
+    d.ops.push({type:o,amt,date:TODAY});toast(o==='pay'?(isOpen(d)?'Ödəniş yazıldı':'Borc bağlandı ✓'):'Borc artırıldı')}
+  else if(type==='jar'){S.jars.push({id:uid(),name:(fd.get('name')||'').trim(),ic:fd.get('ic'),goal:num(fd.get('goal')),due:fd.get('due')||'',ops:[]});toast('Qutu yaradıldı')}
+  else if(type==='jarop'||type==='jarquick'){const j=S.jars.find(x=>x.id===(f.dataset.id||fd.get('jar')));const take=op==='take';
+    if(take&&amt>jarSum(j)+0.004){toast('Qutuda bu qədər pul yoxdur');return}
+    const before=jarSum(j);j.ops.push({amt:take?-amt:amt,date:TODAY});
+    toast(!take&&j.goal&&before<j.goal&&jarSum(j)>=j.goal?'🎉 Hədəfə çatdın!':take?'Götürüldü':'Ehtiyata qoyuldu')}
+  else if(type==='limit'){const k=fd.get('cat');if(amt>0)S.limits[k]=amt;else delete S.limits[k];toast(amt>0?'Limit qoyuldu':'Limit silindi')}
+  save();close();render();
+});
+render();
+})();
+</script>
+<script>
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+</script>
+</body>
+</html>

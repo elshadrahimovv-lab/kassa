@@ -142,10 +142,13 @@ form{display:flex;flex-direction:column;gap:14px}
 .chip input{position:absolute;opacity:0;pointer-events:none}
 .chip span{display:inline-block;padding:8px 12px;border-radius:99px;background:var(--surface-2);font-size:14px;font-weight:600;cursor:pointer;border:1.5px solid transparent}
 .chip input:checked+span{border-color:var(--accent);color:var(--accent)}
+.chip-add{padding:8px 12px;border-radius:99px;border:1.5px dashed var(--line);color:var(--accent);font-weight:700;font-size:14px}
+.newcat{display:flex;flex-direction:column;gap:12px;background:var(--bg);border-radius:16px;padding:14px}
 .chip input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
 .field{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted);font-weight:600}
 .field input{background:var(--surface-2);border:1.5px solid transparent;border-radius:12px;padding:12px;font-size:16px;color:var(--fg);outline:0;min-width:0;width:100%}
 .field input:focus{border-color:var(--accent)}
+.field select{background:var(--surface-2);border:1.5px solid transparent;border-radius:12px;padding:12px;font-size:16px;color:var(--fg);width:100%;min-width:0}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .toggle{display:flex;align-items:center;gap:10px;font-weight:600;font-size:14px}
 .toggle input{width:20px;height:20px;accent-color:var(--accent)}
@@ -185,11 +188,15 @@ const ICONS={
 };
 const svg=(n)=>`<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
 const CAT={
-  in:[{id:'maas',ic:'💼',n:'Maaş',c:'#36c98b'},{id:'frilans',ic:'💻',n:'Frilans',c:'#4fd1c5'},{id:'satis',ic:'🏷️',n:'Satış',c:'#7fa8ff'},{id:'hediyye',ic:'🎁',n:'Hədiyyə',c:'#f0b43c'},{id:'diger',ic:'➕',n:'Digər',c:'#8e8e9a'}],
-  out:[{id:'market',ic:'🛒',n:'Market',c:'#f0b43c'},{id:'yemek',ic:'🍔',n:'Yemək',c:'#ff7a59'},{id:'neqliyyat',ic:'🚕',n:'Nəqliyyat',c:'#7fa8ff'},{id:'kommunal',ic:'🏠',n:'Kommunal',c:'#b48cff'},{id:'telefon',ic:'📱',n:'Telefon/İnternet',c:'#4fd1c5'},{id:'geyim',ic:'👕',n:'Geyim',c:'#ff6fa8'},{id:'saglamliq',ic:'💊',n:'Sağlamlıq',c:'#9bd45b'},{id:'eylence',ic:'🎉',n:'Əyləncə',c:'#ffa94d'},{id:'diger',ic:'➕',n:'Digər',c:'#8e8e9a'}]
+  in:[{id:'maas',ic:'💼',n:'Maaş',c:'#36c98b'},{id:'frilans',ic:'💻',n:'Frilans',c:'#4fd1c5'},{id:'satis',ic:'🏷️',n:'Satış',c:'#7fa8ff'},{id:'hediyye',ic:'🎁',n:'Hədiyyə',c:'#f0b43c'},{id:'borc',ic:'🤝',n:'Borc qaytarıldı',c:'#ff9f43'},{id:'diger',ic:'➕',n:'Digər',c:'#8e8e9a'}],
+  out:[{id:'market',ic:'🛒',n:'Market',c:'#f0b43c'},{id:'yemek',ic:'🍔',n:'Yemək',c:'#ff7a59'},{id:'neqliyyat',ic:'🚕',n:'Nəqliyyat',c:'#7fa8ff'},{id:'kommunal',ic:'🏠',n:'Kommunal',c:'#b48cff'},{id:'telefon',ic:'📱',n:'Telefon/İnternet',c:'#4fd1c5'},{id:'geyim',ic:'👕',n:'Geyim',c:'#ff6fa8'},{id:'saglamliq',ic:'💊',n:'Sağlamlıq',c:'#9bd45b'},{id:'eylence',ic:'🎉',n:'Əyləncə',c:'#ffa94d'},{id:'borcode',ic:'🤝',n:'Borc ödənişi',c:'#ff9f43'},{id:'diger',ic:'➕',n:'Digər',c:'#8e8e9a'}]
 };
 const JAR_IC=['🚗','✈️','🛡️','🏠','📱','🎓','💍','🎁','💰'];
-const cat=(k,id)=>CAT[k].find(c=>c.id===id)||CAT[k][CAT[k].length-1];
+/* built-in categories (without "Digər") plus the ones the user created */
+const allCats=k=>[...CAT[k].filter(c=>c.id!=='diger'),...((S.cats&&S.cats[k])||[])];
+const cat=(k,id)=>allCats(k).find(c=>c.id===id)||CAT[k].find(c=>c.id===id)||CAT[k][CAT[k].length-1];
+const CUSTOM_IC=['🚬','🎓','📚','⛽','🚗','🐶','💇','🏋️','🎮','☕','🍺','👶','🛠️','💡','🧾','✈️','🎁','💻','🏦','❤️'];
+const CUSTOM_COL=['#e879f9','#38bdf8','#facc15','#fb7185','#34d399','#a78bfa','#f97316','#22d3ee','#c084fc','#84cc16'];
 
 /* dates */
 const pad=n=>String(n).padStart(2,'0');
@@ -241,6 +248,7 @@ function sample(){
 let S=null;
 try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 if(!S||S.v!==1)S=sample();
+if(!S.cats)S.cats={in:[],out:[]};
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 
 /* monthly repeats: a template with recur:true gets one copy per following month */
@@ -266,7 +274,6 @@ const debtLeft=d=>Math.round((debtLoan(d)-debtPaid(d))*100)/100;
 const isOpen=d=>debtLeft(d)>0.004;
 function totals(){
   let b=0;S.tx.forEach(t=>b+=t.kind==='in'?t.amt:-t.amt);
-  S.debts.forEach(d=>d.ops.forEach(o=>{const s=(d.dir==='in')===(o.type==='loan')?-1:1;b+=s*o.amt}));
   const saved=S.jars.reduce((s,j)=>s+jarSum(j),0);
   const owedToMe=S.debts.filter(d=>d.dir==='in').reduce((s,d)=>s+Math.max(debtLeft(d),0),0);
   const iOwe=S.debts.filter(d=>d.dir==='out').reduce((s,d)=>s+Math.max(debtLeft(d),0),0);
@@ -291,8 +298,6 @@ let tab='home',mOff={in:0,out:0},debtDir='in';
 function feed(){
   const f=[];
   S.tx.forEach(t=>{const c=cat(t.kind,t.cat);f.push({date:t.date,ic:c.ic,t:t.note||c.n,s:c.n,amt:t.kind==='in'?t.amt:-t.amt,act:'tx:'+t.id})});
-  S.debts.forEach(d=>d.ops.forEach(o=>{const giveOut=(d.dir==='in')===(o.type==='loan');
-    f.push({date:o.date,ic:d.dir==='in'?'🤝':'🧾',t:d.name,s:d.dir==='in'?(o.type==='loan'?'Borc verdim':'Borcu qaytardı'):(o.type==='loan'?'Borc aldım':'Borcumu qaytardım'),amt:giveOut?-o.amt:o.amt,act:'debt:'+d.id})}));
   S.jars.forEach(j=>j.ops.forEach(o=>f.push({date:o.date,ic:j.ic,t:j.name,s:o.amt>0?'Ehtiyata qoydum':'Ehtiyatdan götürdüm',amt:-o.amt,act:'jar:'+j.id,save:true})));
   return f.sort((a,b)=>b.date.localeCompare(a.date));
 }
@@ -417,11 +422,32 @@ function toast(t){const el=document.getElementById('toast');el.textContent=t;el.
 const amountField=(ph)=>`<label class="amount"><input id="f-amt" name="amt" inputmode="decimal" placeholder="${ph||'0'}" autocomplete="off" required autofocus aria-label="Məbləğ"><span>₼</span></label>`;
 const chips=(name,list,sel)=>`<div class="chips">${list.map((c,i)=>`<label class="chip"><input type="radio" name="${name}" value="${c.id}" ${(sel?c.id===sel:i===0)?'checked':''}><span>${c.ic} ${esc(c.n)}</span></label>`).join('')}</div>`;
 
+const catChips=(kind,sel)=>allCats(kind).map((c,i)=>`<label class="chip"><input type="radio" name="cat" value="${c.id}" ${(sel?c.id===sel:i===0)?'checked':''}><span>${c.ic} ${esc(c.n)}</span></label>`).join('')+`<button type="button" class="chip-add" data-act="newcat">＋ Yeni kateqoriya</button>`;
+const catPicker=kind=>`<div class="chips" id="catChips">${catChips(kind)}</div>
+  <div class="newcat" id="newCat" hidden>
+    <label class="field">Yeni kateqoriyanın adı<input id="f-catname" placeholder="${kind==='in'?'məs. Kirayə gəliri':'məs. Siqaret'}" maxlength="24" autocomplete="off"></label>
+    <div class="chips">${CUSTOM_IC.map((ic,i)=>`<label class="chip"><input type="radio" name="catic" value="${ic}" ${i===0?'checked':''}><span style="font-size:20px;padding:6px 10px">${ic}</span></label>`).join('')}</div>
+    <div class="btns"><button type="button" class="btn" data-act="newcat-cancel">Ləğv et</button><button type="button" class="btn primary" data-act="newcat-save:${kind}">Əlavə et</button></div>
+  </div>
+  ${S.cats[kind].length?`<button type="button" class="linkbtn" style="align-self:flex-start;font-size:13px" data-act="mycats:${kind}">Kateqoriyalarım (${S.cats[kind].length})</button>`:''}`;
+function manageCats(kind){
+  open(`<h3>Kateqoriyalarım</h3><div class="k" style="font-weight:500;margin-bottom:8px">Sildiyin kateqoriyadakı qeydlər “Digər” kimi görünəcək.</div>
+  ${S.cats[kind].map(c=>`<div class="row"><span class="tile">${c.ic}</span><span class="mid"><div class="t">${esc(c.n)}</div><div class="s">${S.tx.filter(t=>t.kind===kind&&t.cat===c.id).length} qeyd</div></span><button class="linkbtn" style="color:var(--expense)" data-act="delcat:${kind}:${c.id}">Sil</button></div>`).join('')||'<div class="empty">Öz kateqoriyan yoxdur.</div>'}
+  <button class="btn" style="width:100%;margin-top:12px" data-act="add:${kind}">Geri</button>`);
+}
+const DEBT_CAT={in:'borc',out:'borcode'};
+function debtPicker(kind){
+  const list=S.debts.filter(d=>d.dir===kind&&isOpen(d));
+  return `<div id="debtPick" hidden><label class="field">${kind==='in'?'Kim qaytardı?':'Kimə qaytardın?'}<select id="f-debt" name="debt">${list.map(d=>`<option value="${d.id}">${esc(d.name)} · qalıq ${fmt(debtLeft(d))}</option>`).join('')}<option value="">Borclar siyahısında yoxdur</option></select></label>
+  <div class="k" style="font-weight:500;margin-top:6px">Seçdiyin şəxsin borc qalığı avtomatik azalacaq.</div></div>`;
+}
 function txForm(kind){
-  open(`<h3>${kind==='in'?'Yeni gəlir':'Yeni xərc'}</h3><form data-form="tx" data-kind="${kind}">${amountField()}${chips('cat',CAT[kind])}
+  open(`<h3>${kind==='in'?'Yeni gəlir':'Yeni xərc'}</h3><form data-form="tx" data-kind="${kind}">${amountField()}${catPicker(kind)}${debtPicker(kind)}
   <div class="grid2"><label class="field">Tarix<input type="date" id="f-date" name="date" value="${TODAY}" max="${TODAY}" required></label><label class="field">Qeyd<input id="f-note" name="note" placeholder="İstəyə bağlı" maxlength="60"></label></div>
   <label class="toggle"><input type="checkbox" name="recur" id="f-recur">Hər ay təkrarla${kind==='in'?' (məs. maaş)':' (məs. kirayə)'}</label>
   <button class="btn primary">Yadda saxla</button></form>`);
+  const f=body.querySelector('form'),dp=body.querySelector('#debtPick');
+  f.addEventListener('change',e=>{if(e.target.name==='cat')dp.hidden=e.target.value!==DEBT_CAT[kind]});
 }
 function txDetail(id){
   const t=S.tx.find(x=>x.id===id);if(!t)return;const c=cat(t.kind,t.cat);
@@ -439,6 +465,7 @@ function debtForm(pre){
   <label class="field">Kim?<input id="f-name" name="name" list="names" required placeholder="Ad" maxlength="40" value="${esc(pre||'')}"></label><datalist id="names">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
   <div class="grid2"><label class="field">Tarix<input type="date" id="f-date" name="date" value="${TODAY}" max="${TODAY}" required></label><label class="field">Qaytarma tarixi<input type="date" id="f-due" name="due" min="${TODAY}"></label></div>
   <label class="field">Qeyd<input id="f-note" name="note" placeholder="Nə üçün?" maxlength="60"></label>
+  <div class="k" style="font-weight:500">Borc yalnız Borclar bölməsində saxlanılır, balansa təsir etmir. Qaytarılanda gəlir kimi yazılır.</div>
   <button class="btn primary">Yadda saxla</button></form>`);
 }
 function debtDetail(id){
@@ -447,7 +474,7 @@ function debtDetail(id){
   open(`<h3>${esc(d.name)}</h3><div class="k">${d.dir==='in'?'Mənə borcludur':'Mən borcluyam'}${d.note?' · '+esc(d.note):''}</div>
   <div class="num" style="font-size:34px;font-weight:800;margin-top:6px;color:${isOpen(d)?(d.dir==='in'?'var(--debt)':'var(--expense)'):'var(--income)'}">${isOpen(d)?fmt(left):'Bağlanıb ✓'}</div>
   <div style="margin:10px 0 16px"><div class="stat"><span>Ümumi borc</span><b class="num">${fmt(debtLoan(d))}</b></div><div class="stat"><span>Qaytarılıb</span><b class="num in">${fmt(debtPaid(d))}</b></div>${d.due?`<div class="stat"><span>Qaytarma tarixi</span><b>${dLabel(d.due)}</b></div>`:''}</div>
-  <form data-form="debtop" data-id="${d.id}">${amountField(isOpen(d)?String(left).replace('.',','):'0')}
+  <form data-form="debtop" data-id="${d.id}">${amountField(isOpen(d)?String(left).replace('.',','):'0')}<label class="toggle"><input type="checkbox" name="astx" id="f-astx" checked>${d.dir==='in'?'Ödənişi gəlir kimi də yaz (balansa əlavə olunsun)':'Ödənişi xərc kimi də yaz (balansdan çıxılsın)'}</label>
   <div class="btns"><button class="btn primary" name="op" value="pay" ${isOpen(d)?'':'disabled'}>Ödəniş əlavə et</button><button class="btn" name="op" value="loan">${d.dir==='in'?'Yenə borc ver':'Yenə borc al'}</button></div></form>
   <h2>Tarixçə</h2><div>${ops.map(o=>`<div class="row"><span class="tile">${o.type==='loan'?'↗':'↙'}</span><span class="mid"><div class="t">${o.type==='loan'?(d.dir==='in'?'Borc verdim':'Borc aldım'):(d.dir==='in'?'Qaytardı':'Qaytardım')}</div><div class="s">${dLabel(o.date)}</div></span><span class="a num ${o.type==='pay'?'in':''}">${fmt(o.amt)}</span></div>`).join('')}</div>
   <button class="btn danger" style="width:100%;margin-top:10px" data-act="deldebt:${d.id}">Bu borcu sil</button>`);
@@ -462,16 +489,16 @@ function jarDetail(id){
   const j=S.jars.find(x=>x.id===id);if(!j)return;const s=jarSum(j);
   open(`<h3>${j.ic} ${esc(j.name)}</h3><div class="num sav" style="font-size:34px;font-weight:800">${fmt(s)}</div>
   ${j.goal?`<div class="k" style="margin-top:4px">Məqsəd: ${fmt(j.goal)} · ${Math.round(s/j.goal*100)}%</div><div class="track" style="margin-top:10px"><div class="fill" style="width:${Math.min(s/j.goal,1)*100}%;background:var(--save)"></div></div><div class="advice" style="margin-top:10px;font-size:13px;color:var(--muted)">${jarAdvice(j)}</div>`:''}
-  <form data-form="jarop" data-id="${j.id}" style="margin-top:16px">${amountField()}<div class="btns"><button class="btn primary" name="op" value="put">Pul qoy</button><button class="btn" name="op" value="take">Pul götür</button></div></form>
+  <form data-form="jarop" data-id="${j.id}" style="margin-top:16px">${amountField()}<div class="btns"><button class="btn primary" name="op" value="put">Pul qoy</button><button class="btn" name="op" value="take">Pul götür</button></div><div class="k" style="font-weight:500">Qoyduğun pul balansdan çıxılır, götürdüyün pul balansa qayıdır.</div></form>
   <h2>Tarixçə</h2><div>${[...j.ops].sort((a,b)=>b.date.localeCompare(a.date)).map(o=>`<div class="row"><span class="tile">${o.amt>0?'↓':'↑'}</span><span class="mid"><div class="t">${o.amt>0?'Qoydum':'Götürdüm'}</div><div class="s">${dLabel(o.date)}</div></span><span class="a num ${o.amt>0?'sav':''}">${fmt(o.amt,true)}</span></div>`).join('')||'<div class="empty">Hələ əməliyyat yoxdur.</div>'}</div>
   <button class="btn danger" style="width:100%;margin-top:10px" data-act="deljar:${j.id}">Qutunu sil</button>`);
 }
 function jarQuick(){
   if(!S.jars.length){jarForm();return}
-  open(`<h3>Ehtiyata qoy</h3><form data-form="jarquick">${amountField()}${chips('jar',S.jars.map(j=>({id:j.id,ic:j.ic,n:j.name})))}<button class="btn primary">Qoy</button></form>`);
+  open(`<h3>Ehtiyata qoy</h3><form data-form="jarquick">${amountField()}${chips('jar',S.jars.map(j=>({id:j.id,ic:j.ic,n:j.name})))}<div class="k" style="font-weight:500">Bu məbləğ istifadə edilə bilən balansdan avtomatik çıxılacaq. Xərc kimi ayrıca yazmağa ehtiyac yoxdur.</div><button class="btn primary">Qoy</button></form>`);
 }
 function limitForm(pre){
-  const list=[{id:'total',ic:'Σ',n:'Ümumi aylıq'},...CAT.out.filter(c=>c.id!=='diger')];
+  const list=[{id:'total',ic:'Σ',n:'Ümumi aylıq'},...allCats('out')];
   open(`<h3>Aylıq limit</h3><form data-form="limit">${chips('cat',list,pre||'total')}${amountField()}
   <div class="k" style="font-weight:500">Limiti silmək üçün 0 yaz. 80%-ə çatanda və limit keçiləndə Ana səhifədə xəbərdarlıq görünəcək.</div>
   <button class="btn primary">Yadda saxla</button></form>`);
@@ -503,12 +530,24 @@ document.addEventListener('click',e=>{
     case 'm':mOff[b]=Math.min(0,mOff[b]+Number(c));render();break;
     case 'dir':debtDir=b;render();break;
     case 'clear':confirmDel('Nümunə məlumatlar silinsin?','doclear');break;
-    case 'doclear':S={v:1,sample:false,tx:[],limits:{},debts:[],jars:[]};save();close();render();toast('Təmiz başlanğıc');break;
+    case 'doclear':S={v:1,sample:false,tx:[],limits:{},debts:[],jars:[],cats:S.cats||{in:[],out:[]}};save();close();render();toast('Təmiz başlanğıc');break;
+    case 'newcat':{const p=document.getElementById('newCat');p.hidden=false;el.hidden=true;setTimeout(()=>document.getElementById('f-catname').focus(),50);break}
+    case 'newcat-cancel':{document.getElementById('newCat').hidden=true;const ab=document.querySelector('.chip-add');if(ab)ab.hidden=false;break}
+    case 'newcat-save':{
+      const inp=document.getElementById('f-catname');const name=inp.value.trim();
+      if(!name){toast('Kateqoriyanın adını yaz');inp.focus();break}
+      let c=allCats(b).find(x=>x.n.toLowerCase()===name.toLowerCase());
+      if(!c){c={id:'c_'+uid(),ic:(document.querySelector('input[name=catic]:checked')||{}).value||'🏷️',n:name,c:CUSTOM_COL[S.cats[b].length%CUSTOM_COL.length]};S.cats[b].push(c);save();toast('Kateqoriya yaradıldı')}
+      document.getElementById('catChips').innerHTML=catChips(b,c.id);
+      document.getElementById('newCat').hidden=true;inp.value='';break}
+    case 'mycats':manageCats(b);break;
+    case 'delcat':confirmDel('Kateqoriya silinsin?','dodelcat:'+b+':'+c);break;
+    case 'dodelcat':S.cats[b]=S.cats[b].filter(x=>x.id!==c);S.tx.forEach(t=>{if(t.kind===b&&t.cat===c)t.cat='diger'});delete S.limits[c];save();render();manageCats(b);toast('Silindi');break;
     case 'deltx':confirmDel('Qeyd silinsin?','dodeltx:'+b);break;
-    case 'dodeltx':S.tx=S.tx.filter(t=>t.id!==b);save();close();render();toast('Silindi');break;
+    case 'dodeltx':{const t=S.tx.find(x=>x.id===b);if(t&&t.debtId){const d=S.debts.find(x=>x.id===t.debtId);if(d)d.ops=d.ops.filter(o=>o.txId!==b)}}S.tx=S.tx.filter(t=>t.id!==b);save();close();render();toast('Silindi');break;
     case 'stoprecur':{const t=S.tx.find(x=>x.id===b);if(t)t.recur=false;save();close();render();toast('Təkrar dayandırıldı');break}
     case 'deldebt':confirmDel('Borc silinsin?','dodeldebt:'+b);break;
-    case 'dodeldebt':S.debts=S.debts.filter(d=>d.id!==b);save();close();render();toast('Silindi');break;
+    case 'dodeldebt':S.tx.forEach(t=>{if(t.debtId===b)delete t.debtId});S.debts=S.debts.filter(d=>d.id!==b);save();close();render();toast('Silindi');break;
     case 'deljar':confirmDel('Qutu silinsin?','dodeljar:'+b);break;
     case 'dodeljar':S.jars=S.jars.filter(j=>j.id!==b);save();close();render();toast('Silindi');break;
   }
@@ -519,7 +558,12 @@ document.addEventListener('submit',e=>{
   const op=(e.submitter&&e.submitter.value)||'';
   const amt=num(fd.get('amt'));
   if(type!=='jar'&&type!=='limit'&&!(amt>0)){toast('Məbləği yaz');return}
-  if(type==='tx'){S.tx.push({id:uid(),kind:f.dataset.kind,amt,cat:fd.get('cat'),date:fd.get('date')||TODAY,note:(fd.get('note')||'').trim(),recur:!!fd.get('recur')});
+  if(type==='tx'){const kind=f.dataset.kind,c=fd.get('cat');
+    const d=c===DEBT_CAT[kind]&&fd.get('debt')?S.debts.find(x=>x.id===fd.get('debt')):null;
+    if(d&&amt>debtLeft(d)+0.004){toast('Qalıqdan çox ola bilməz: '+fmt(debtLeft(d)));return}
+    const t={id:uid(),kind,amt,cat:c,date:fd.get('date')||TODAY,note:(fd.get('note')||'').trim()||(d?(kind==='in'?d.name+' borcu qaytardı':d.name+' adlı şəxsə borc ödənişi'):''),recur:!!fd.get('recur')&&!d};
+    if(d){t.debtId=d.id;d.ops.push({type:'pay',amt,date:t.date,txId:t.id})}
+    S.tx.push(t);
     const k=f.dataset.kind;mOff[k]=0;toast(k==='in'?'Gəlir əlavə olundu':'Xərc əlavə olundu')}
   else if(type==='debt'){const dir=fd.get('dir'),name=(fd.get('name')||'').trim(),date=fd.get('date')||TODAY;
     let d=S.debts.find(x=>x.dir===dir&&x.name.toLowerCase()===name.toLowerCase()&&isOpen(x));
@@ -528,7 +572,9 @@ document.addEventListener('submit',e=>{
     debtDir=dir;toast(d?'Borc karta əlavə olundu':'Borc yazıldı')}
   else if(type==='debtop'){const d=S.debts.find(x=>x.id===f.dataset.id);const o=op||'pay';
     if(o==='pay'&&amt>debtLeft(d)+0.004){toast('Qalıqdan çox ola bilməz');return}
-    d.ops.push({type:o,amt,date:TODAY});toast(o==='pay'?(isOpen(d)?'Ödəniş yazıldı':'Borc bağlandı ✓'):'Borc artırıldı')}
+    const op={type:o,amt,date:TODAY};
+    if(o==='pay'&&fd.get('astx')){const kind=d.dir;const t={id:uid(),kind,amt,cat:DEBT_CAT[kind],date:TODAY,note:kind==='in'?d.name+' borcu qaytardı':d.name+' adlı şəxsə borc ödənişi',recur:false,debtId:d.id};S.tx.push(t);op.txId=t.id}
+    d.ops.push(op);toast(o==='pay'?(isOpen(d)?'Ödəniş yazıldı':'Borc bağlandı ✓'):'Borc artırıldı')}
   else if(type==='jar'){S.jars.push({id:uid(),name:(fd.get('name')||'').trim(),ic:fd.get('ic'),goal:num(fd.get('goal')),due:fd.get('due')||'',ops:[]});toast('Qutu yaradıldı')}
   else if(type==='jarop'||type==='jarquick'){const j=S.jars.find(x=>x.id===(f.dataset.id||fd.get('jar')));const take=op==='take';
     if(take&&amt>jarSum(j)+0.004){toast('Qutuda bu qədər pul yoxdur');return}

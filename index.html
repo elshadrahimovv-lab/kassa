@@ -2,7 +2,7 @@
 <html lang="az">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Kassa</title>
 <meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -31,7 +31,7 @@
   --bg:#000000; --surface:#1c1c1e; --surface-2:#2c2c2e; --line:#38383a;
   --fg:#ffffff; --muted:#98989f; --accent:#5e5ce6; --accent-ink:#ffffff; --status:#000000;
   --income:#30d158; --expense:#ff453a; --debt:#ff9f0a; --save:#64d2ff; color-scheme:dark}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 html{padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
 body{margin:0;overscroll-behavior-y:none}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--status)}
@@ -1202,6 +1202,7 @@ document.addEventListener('submit',e=>{
   save();close();render();
 });
 try{localStorage.removeItem('kassa.pin')}catch(e){}
+['gesturestart','gesturechange'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault(),{passive:false}));
 render();syncThemeColor();
 })();
 </script>

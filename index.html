@@ -183,19 +183,6 @@ form{display:flex;flex-direction:column;gap:14px}
 .notice .acts button{color:var(--accent);font-weight:600;font-size:14px}
 .notice .acts button.mute{color:var(--muted);font-weight:500}
 .hero .big{cursor:pointer;display:block;text-align:left}
-#lock{position:fixed;inset:0;z-index:100;background:var(--bg);display:grid;place-items:center;padding:env(safe-area-inset-top,0px) 24px env(safe-area-inset-bottom,0px)}
-.lockin{width:100%;max-width:320px;display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center}
-.lk-title{font-size:22px;font-weight:700}
-.lk-sub{color:var(--muted);font-size:15px;min-height:20px;line-height:1.45}
-.dots{display:flex;gap:18px;margin-block:6px}
-.dots i{width:14px;height:14px;border-radius:50%;border:2px solid var(--muted)}
-.dots i.on{background:var(--fg);border-color:var(--fg)}
-.dots.err{animation:shake .35s}
-@keyframes shake{25%{transform:translateX(-10px)}50%{transform:translateX(10px)}75%{transform:translateX(-6px)}}
-.pad{display:grid;grid-template-columns:repeat(3,76px);gap:16px 24px;margin-top:6px}
-.pad button{width:76px;height:76px;border-radius:50%;background:var(--surface);font-size:30px;font-weight:400}
-.pad button.plain{background:none;font-size:15px;font-weight:500}
-.lockin .btn{width:100%}
 @media (prefers-reduced-motion:reduce){#sheet,#scrim,.toast{transition:none}}
 @media (max-width:360px){.donutwrap{grid-template-columns:1fr;justify-items:center}.legend{width:100%}.hero .big{font-size:36px}}
 </style>
@@ -208,7 +195,6 @@ form{display:flex;flex-direction:column;gap:14px}
 <div id="scrim" hidden data-act="close"></div>
 <div id="sheet" hidden role="dialog" aria-modal="true"><div class="grab"></div><div id="sheetBody"></div></div>
 <div class="toast" id="toast" role="status"></div>
-<div id="lock" hidden role="dialog" aria-modal="true" aria-label="Kilid"></div>
 
 <script>
 (function(){
@@ -575,8 +561,6 @@ function settings(){
   <h2>Görünüş</h2>
   <div class="seg seg3" role="group">${[['auto','Avtomatik'],['light','Açıq'],['dark','Tünd']].map(([k,l])=>`<button data-act="theme:${k}" aria-pressed="${t===k}">${l}</button>`).join('')}</div>
   <div class="k" style="font-weight:400;margin-top:8px">Avtomatik rejimdə telefonun öz ayarına uyğun dəyişir.</div>
-  <h2>Təhlükəsizlik</h2>
-  <div>${setRow('pin','lock','var(--accent)','PIN kod',getPin()?'Aktivdir':'Söndürülüb')}</div>
   <h2>Balans</h2>
   <div>${setRow('balance','scale','var(--income)','Balansı düzəlt','Tətbiqdəki balansı real pula uyğunlaşdır')}</div>
   <h2>Nüsxə</h2>
@@ -640,55 +624,6 @@ function balanceForm(){
   ${first?'':`<div class="k" style="font-weight:400">Tətbiqdə indi: <b class="num">${fmt(T.bal)}</b></div>`}
   <button class="btn primary">Yadda saxla</button></form>`);
 }
-/* PIN lock: a privacy screen; the PIN itself is stored only as a salted hash */
-const PINKEY='kassa.pin';
-const getPin=()=>{try{return JSON.parse(localStorage.getItem(PINKEY))}catch(e){return null}};
-async function hashPin(pin,salt){const d=new TextEncoder().encode(salt+':'+pin);
-  if(window.crypto&&crypto.subtle){const h=await crypto.subtle.digest('SHA-256',d);return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('')}
-  let x=7;for(const c of d)x=(x*31+c)|0;return 'h'+x}
-const checkPin=async pin=>{const P=getPin();return !!P&&await hashPin(pin,P.salt)===P.hash};
-async function storePin(pin){const salt=[...crypto.getRandomValues(new Uint8Array(8))].map(b=>b.toString(16).padStart(2,'0')).join('');
-  try{localStorage.setItem(PINKEY,JSON.stringify({salt,hash:await hashPin(pin,salt)}))}catch(e){}}
-const lockEl=document.getElementById('lock');let pinCb=null,pinBuf='',hiddenAt=0;
-function pinPad(title,sub,cb,opts){
-  opts=opts||{};pinCb=cb;pinBuf='';lockEl.hidden=false;
-  lockEl.innerHTML=`<div class="lockin"><div class="lk-title">${title}</div><div class="lk-sub" id="lkSub">${sub}</div>
-  <div class="dots" id="dots">${'<i></i>'.repeat(4)}</div>
-  <div class="pad">${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-pin="${n}">${n}</button>`).join('')}
-  <button class="plain" data-pin="x" ${opts.cancel?'':'style="visibility:hidden"'}>Ləğv et</button><button data-pin="0">0</button><button class="plain" data-pin="b" aria-label="Sil" style="font-size:24px">⌫</button></div>
-  ${opts.forgot?'<button class="linkbtn" data-pin="f">PIN-i unutmusan?</button>':''}</div>`;
-}
-const dots=()=>document.querySelectorAll('#dots i').forEach((d,i)=>d.classList.toggle('on',i<pinBuf.length));
-function pinFail(msg){const d=document.getElementById('dots');pinBuf='';dots();document.getElementById('lkSub').textContent=msg;d.classList.remove('err');void d.offsetWidth;d.classList.add('err')}
-const unlockPad=()=>pinPad('Kassa','PIN kodu daxil et',async v=>{if(await checkPin(v))lockEl.hidden=true;else pinFail('PIN səhvdir, yenidən yaz')},{forgot:true});
-function pinForgot(){
-  lockEl.innerHTML=`<div class="lockin"><div class="lk-title">PIN-i unutmusan?</div>
-  <div class="lk-sub">PIN yalnız bu telefonda saxlanılır və bərpa olunmur. Tətbiqə qayıtmağın yolu ehtiyat nüsxədir: indiki məlumatlar silinəcək və nüsxədəki məlumatlar yüklənəcək. PIN söndürüləcək.</div>
-  <label class="btn primary" style="display:grid;place-items:center;cursor:pointer" for="f-restore">Nüsxədən bərpa et<input type="file" id="f-restore" class="vh" accept=".json,application/json"></label>
-  <button class="btn" data-pin="back">Geri</button></div>`;
-}
-function restoreFromLock(file){
-  const r=new FileReader();r.onload=()=>{let o;try{o=JSON.parse(r.result)}catch(e){toast('Fayl oxunmadı');return}
-    const d=o&&o.app==='kassa'?o.data:o;
-    if(!d||d.v!==1||!Array.isArray(d.tx)||!Array.isArray(d.debts)||!Array.isArray(d.jars)){toast('Bu fayl Kassa nüsxəsi deyil');return}
-    try{localStorage.removeItem(PINKEY)}catch(e){}
-    S=d;if(!S.cats)S.cats={in:[],out:[]};if(!S.limits)S.limits={};applyRecurring();save();lockEl.hidden=true;tab='home';render();toast('Nüsxədən bərpa olundu')};
-  r.readAsText(file);
-}
-function pinSettings(){
-  if(!getPin()){let first='';
-    pinPad('Yeni PIN','4 rəqəmli PIN kod seç',v=>{
-      if(!first){first=v;pinBuf='';dots();document.getElementById('lkSub').textContent='PIN-i təkrar yaz';return}
-      if(v!==first){first='';pinFail('Uyğun gəlmədi, yenidən seç');return}
-      storePin(v).then(()=>{lockEl.hidden=true;settings();toast('PIN qoyuldu')})},{cancel:true});return}
-  open(`<h3>PIN kod</h3><div class="k" style="font-weight:400;line-height:1.45;margin-bottom:14px">Tətbiq açılanda və 30 saniyədən çox arxa fonda qalanda PIN soruşulur.</div>
-  <div class="stack"><button class="btn" data-act="pinchange">PIN-i dəyiş</button><button class="btn danger" data-act="pinoff">PIN-i söndür</button></div>`);
-}
-function pinVerifyThen(fn){pinPad('Kassa','Cari PIN kodu daxil et',async v=>{if(await checkPin(v))fn();else pinFail('PIN səhvdir')},{cancel:true})}
-document.addEventListener('click',e=>{const b=e.target.closest('[data-pin]');if(!b)return;const k=b.dataset.pin;
-  if(k==='x'){lockEl.hidden=true;return}if(k==='f'){pinForgot();return}if(k==='back'){unlockPad();return}
-  if(k==='b'){pinBuf=pinBuf.slice(0,-1);dots();return}
-  if(pinBuf.length>=4)return;pinBuf+=k;dots();if(pinBuf.length===4){const v=pinBuf;setTimeout(()=>pinCb&&pinCb(v),120)}});
 function allFeed(){
   const f=feed();let h='',last='';
   f.forEach(x=>{if(x.date!==last){h+=`<div class="daylbl">${dLabel(x.date)}</div>`;last=x.date}h+=rowHTML(x)});
@@ -715,9 +650,6 @@ document.addEventListener('click',e=>{
     case 'balok':S.balanceSet=true;save();render();break;
     case 'edittx':{const t=S.tx.find(x=>x.id===b);if(t)txForm(t.kind,t);break}
     case 'undo':if(undoState){S=JSON.parse(undoState);undoState=null;save();close();render();toast('Geri qaytarıldı')}break;
-    case 'pin':pinSettings();break;
-    case 'pinchange':close();pinVerifyThen(()=>{try{localStorage.removeItem(PINKEY)}catch(e){}pinSettings()});break;
-    case 'pinoff':close();pinVerifyThen(()=>{try{localStorage.removeItem(PINKEY)}catch(e){}lockEl.hidden=true;toast('PIN söndürüldü')});break;
     case 'settings':settings();break;
     case 'theme':setTheme(b);settings();break;
     case 'export':exportData();break;
@@ -750,11 +682,9 @@ document.addEventListener('click',e=>{
   }
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!sheet.hidden)close()});
-document.addEventListener('change',e=>{if(e.target.id==='f-import'&&e.target.files[0])readImport(e.target.files[0]);if(e.target.id==='f-restore'&&e.target.files[0])restoreFromLock(e.target.files[0])});
+document.addEventListener('change',e=>{if(e.target.id==='f-import'&&e.target.files[0])readImport(e.target.files[0])});
 /* the phone can keep the app open for days: start fresh when the date has changed */
-document.addEventListener('visibilitychange',()=>{if(document.hidden){hiddenAt=Date.now();return}
-  if(iso(new Date())!==TODAY){location.reload();return}
-  if(getPin()&&lockEl.hidden&&Date.now()-hiddenAt>30000)unlockPad()});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&iso(new Date())!==TODAY)location.reload()});
 document.addEventListener('submit',e=>{
   e.preventDefault();const f=e.target,fd=new FormData(f),type=f.dataset.form;
   if(type==='samples'){snap();const picks=fd.getAll('pick').map(v=>v.split(':'));const ids=k=>new Set(picks.filter(p=>p[0]===k).map(p=>p[1]));
@@ -803,7 +733,7 @@ document.addEventListener('submit',e=>{
   else if(type==='limit'){const k=fd.get('cat');if(amt>0)S.limits[k]=amt;else delete S.limits[k];toast(amt>0?'Limit qoyuldu':'Limit silindi')}
   save();close();render();
 });
-if(getPin())unlockPad();
+try{localStorage.removeItem('kassa.pin')}catch(e){}
 render();syncThemeColor();
 })();
 </script>

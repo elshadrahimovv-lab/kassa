@@ -45,7 +45,7 @@ button{cursor:pointer;border:0;background:none;padding:0}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
 .num{font-variant-numeric:tabular-nums}
 #app{max-width:480px;margin:0 auto;padding-block:12px 120px}
-.top{display:flex;align-items:center;justify-content:space-between;padding-block:6px 14px}
+.top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding-block:6px 14px}
 .brand{font-weight:700;font-size:28px;letter-spacing:-.02em}
 .avatar{width:38px;height:38px;border-radius:50%;background:var(--surface);display:grid;place-items:center;color:var(--fg)}
 .avatar svg{width:22px;height:22px}
@@ -165,6 +165,9 @@ form{display:flex;flex-direction:column;gap:14px}
 .field input:focus{border-color:var(--accent)}
 .field select{background:var(--surface-2);border:1.5px solid transparent;border-radius:12px;padding:12px;font-size:16px;color:var(--fg);width:100%;min-width:0}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid2>*{min-width:0}
+.field input[type=date]{min-width:0;-webkit-appearance:none;appearance:none;min-height:46px}
+@media (max-width:360px){.grid2{grid-template-columns:1fr}}
 .toggle{display:flex;align-items:center;gap:10px;font-weight:600;font-size:14px}
 .toggle input{width:20px;height:20px;accent-color:var(--accent)}
 .btn{height:52px;border-radius:14px;font-weight:700;font-size:16px;background:var(--surface-2)}
@@ -324,7 +327,8 @@ if(!S.cats)S.cats={in:[],out:[]};
 if(!S.presets)S.presets=[];if(!S.memo)S.memo={};
 if(!S.plans)S.plans=[];if(!S.loans)S.loans=[];if(!S.wishes)S.wishes=[];
 if(!S.accounts)S.accounts=[];if(!S.transfers)S.transfers=[];
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+let saves=0;
+const save=()=>{saves++;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast&&toast('Yaddaş doludur: məlumat saxlanmadı. Nüsxə al və köhnə şəkilləri sil.')}};
 
 /* monthly repeats: a template with recur:true gets one copy per following month */
 function applyRecurring(){
@@ -335,7 +339,7 @@ function applyRecurring(){
       if(date<=t.date.slice(0,7)+'-31'||date>TODAY)continue;
       const key=date.slice(0,7);
       if(!S.tx.some(x=>x.recurOf===t.id&&x.date.slice(0,7)===key))
-        S.tx.push({...t,amt:t.recurAmt??t.amt,recurAmt:undefined,id:uid(),date,recur:false,recurOf:t.id});
+        S.tx.push({...t,amt:t.recurAmt??t.amt,recurAmt:undefined,photo:undefined,id:uid(),date,recur:false,recurOf:t.id});
     }
   });
 }
@@ -674,8 +678,8 @@ function open(html){clearTimeout(close.t);lastFocus=document.activeElement;body.
   requestAnimationFrame(()=>{scrim.classList.add('open');sheet.classList.add('open')});
   const f=body.querySelector('[autofocus]');if(f)setTimeout(()=>f.focus(),260)}
 function close(){scrim.classList.remove('open');sheet.classList.remove('open');clearTimeout(close.t);close.t=setTimeout(()=>{scrim.hidden=true;sheet.hidden=true;body.innerHTML=''},230);if(lastFocus&&lastFocus.focus)lastFocus.focus()}
-let undoState=null;
-const snap=()=>{undoState=JSON.stringify(S)};
+let undoState=null,undoAt=-1;
+const snap=()=>{undoState=JSON.stringify(S);undoAt=saves};
 function toast(t,undo){const el=document.getElementById('toast');el.innerHTML=esc(t)+(undo?'<button data-act="undo">Geri qaytar</button>':'');
   el.classList.toggle('act',!!undo);el.classList.add('show');clearTimeout(toast.h);
   toast.h=setTimeout(()=>{el.classList.remove('show','act');if(undo)undoState=null},undo?5000:1800)}
@@ -807,7 +811,7 @@ function settings(){
   <div class="k" style="font-weight:400;margin-top:8px">Avtomatik rejimdə telefonun öz ayarına uyğun dəyişir.</div>
   <h2>Balans</h2>
   <div>${setRow('balance','scale','var(--income)','Balansı düzəlt','Tətbiqdəki balansı real pula uyğunlaşdır')}
-  ${setRow('accs','scale','var(--accent)','Hesablar',accounts().length?accounts().map(a=>a.name).join(', '):'Nağd, kartlar')}
+  ${setRow('accs','scale','var(--accent)','Hesablar',accounts().length?esc(accounts().map(a=>a.name).join(', ')):'Nağd, kartlar')}
   ${setRow('report','repeat','var(--income)','Hesabat və CSV','Qrafik, müqayisə, Excel cədvəli')}
   ${setRow('period','repeat','var(--accent)','Ayın başlanğıcı',(S.monthStart||1)===1?'Ayın 1-i':'Hər ayın '+S.monthStart+' günü')}
   ${setRow('round','save','var(--save)','Yuvarlaqlaşdırma',S.roundup&&S.roundup.on?'Aktivdir':'Söndürülüb')}
@@ -908,12 +912,16 @@ function accRow(){if(!accounts().length)return '';
 function accSheet(){
   open(`<h3>Hesablar</h3><div class="k" style="font-weight:400;line-height:1.45">Nağd pul və kartlarını ayrıca izlə. Qeyd yazanda hansı hesabdan olduğunu seçirsən. Köçürmə ümumi balansı dəyişmir.</div>
   <div style="margin-top:6px">${accounts().map(a=>`<button class="row" data-act="acc:${a.id}"><span class="tile">${a.ic}</span><span class="mid"><div class="t">${esc(a.name)}</div></span><span class="a num">${fmt(accBal(a.id))}</span></button>`).join('')||'<div class="empty">Hələ hesab yoxdur.</div>'}</div>
-  <div class="btns" style="margin-top:12px"><button class="btn primary" data-act="newacc">＋ Hesab</button><button class="btn" data-act="transfer" ${accounts().length<2?'disabled':''}>⇄ Köçürmə</button></div>`)}
+  ${(()=>{if(!accounts().length)return '';const T=totals(),rest=Math.round((T.bal+T.saved-accounts().reduce((a,x)=>a+accBal(x.id),0))*100)/100;
+    return Math.abs(rest)>=1?`<div class="k" style="font-weight:400;margin-top:8px">Hesablara bölünməmiş: <b class="num">${fmt(rest)}</b> (ehtiyat qutuları daxil)</div>`:''})()}
+  <div class="btns" style="margin-top:12px"><button class="btn primary" data-act="newacc">＋ Hesab</button><button class="btn" data-act="transfer" ${accounts().length<2?'disabled':''}>⇄ Köçürmə</button></div>
+  ${(()=>{const tr=S.transfers.filter(x=>!x.setup).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,15);if(!tr.length)return '';const nm=id=>{const a=accounts().find(x=>x.id===id);return a?a.ic+' '+esc(a.name):'—'};
+    return `<h2>Köçürmələr</h2><div>${tr.map(x=>`<div class="row"><span class="tile">⇄</span><span class="mid"><div class="t">${nm(x.from)} → ${nm(x.to)}</div><div class="s">${dLabel(x.date)}</div></span><span class="a num">${fmt(x.amt)}</span><button class="linkbtn" style="color:var(--expense);margin-left:10px" data-act="deltr:${x.id}" aria-label="Köçürməni sil">Sil</button></div>`).join('')}</div>`})()}`)}
 function accForm(a){const v=a||{};
   open(`<h3>${a?'Hesab':'Yeni hesab'}</h3><form data-form="acc" ${a?`data-id="${a.id}"`:''}><label class="field">Ad<input id="f-name" name="name" required maxlength="20" placeholder="məs. Leobank, Nağd" value="${esc(v.name||'')}"></label>
   <div class="chips">${['💳','💵','🏦','📱','🪙','👛'].map((ic,i)=>`<label class="chip"><input type="radio" name="ic" value="${ic}" ${(v.ic?ic===v.ic:i===0)?'checked':''}><span style="font-size:20px;padding:6px 10px">${ic}</span></label>`).join('')}</div>
   <label class="field">${a?'Hesabda indi nə qədər var? (₼)':'Hesabda indi nə qədər var? (₼)'}<input id="f-amt" name="amt" inputmode="decimal" value="${a?String(accBal(a.id)).replace('.',','):''}" placeholder="0"></label>
-  <div class="k" style="font-weight:400">Fərq “Balans düzəlişi” kimi yazılır, hesabata düşmür.</div>
+  <div class="k" style="font-weight:400;line-height:1.45">Bu, ümumi balansı dəyişmir, sadəcə pulun harada olduğunu göstərir. Ümumi balans səhvdirsə, “Balansı düzəlt”dən istifadə et.</div>
   <button class="btn primary">Yadda saxla</button>${a?`<button type="button" class="btn danger" data-act="delacc:${a.id}">Hesabı sil</button>`:''}</form>`)}
 function transferForm(){const A=accounts();if(A.length<2){toast('Köçürmə üçün ən az 2 hesab lazımdır');accSheet();return}
   open(`<h3>Köçürmə</h3><form data-form="transfer">${amountField()}<div class="field" style="gap:8px">Haradan${chips('from',A.map(a=>({id:a.id,ic:a.ic,n:a.name})),A[0].id)}</div>
@@ -1014,6 +1022,7 @@ document.addEventListener('click',e=>{
     case 'acc':accForm(S.accounts.find(x=>x.id===b));break;
     case 'delacc':snap();S.tx.forEach(t=>{if(t.acc===b)delete t.acc});S.transfers=S.transfers.filter(x=>x.from!==b&&x.to!==b);S.accounts=S.accounts.filter(x=>x.id!==b);if(S.lastAcc===b)delete S.lastAcc;save();close();render();toast('Hesab silindi',true);break;
     case 'transfer':transferForm();break;
+    case 'deltr':snap();S.transfers=S.transfers.filter(x=>x.id!==b);save();accSheet();render();toast('Köçürmə silindi',true);break;
     case 'photo':IDB.get(b).then(src=>{if(src)open(`<img src="${src}" alt="Qəbz şəkli" style="width:100%;border-radius:12px"><button class="btn" style="width:100%;margin-top:12px" data-act="tx:${b}">Geri</button>`)});break;
     case 'delphoto':{const t=S.tx.find(x=>x.id===b);IDB.set(b,null).catch(()=>{});if(t){delete t.photo;save();drawPhoto(t)}toast('Şəkil silindi');break}
     case 'plans':plansSheet();break;
@@ -1049,7 +1058,7 @@ document.addEventListener('click',e=>{
     case 'balance':balanceForm();break;
     case 'balok':S.balanceSet=true;save();render();break;
     case 'edittx':{const t=S.tx.find(x=>x.id===b);if(t)txForm(t.kind,t);break}
-    case 'undo':if(undoState){S=JSON.parse(undoState);undoState=null;save();close();render();toast('Geri qaytarıldı')}break;
+    case 'undo':if(undoState&&saves===undoAt+1){S=JSON.parse(undoState);undoState=null;save();close();render();toast('Geri qaytarıldı')}else{undoState=null;toast('Sonra başqa dəyişiklik edildiyi üçün geri qaytarmaq olmur')}break;
     case 'settings':settings();break;
     case 'theme':setTheme(b);settings();break;
     case 'export':exportData();break;
@@ -1078,7 +1087,7 @@ document.addEventListener('click',e=>{
     case 'deldebt':confirmDel('Borc silinsin?','dodeldebt:'+b);break;
     case 'dodeldebt':snap();S.tx.forEach(t=>{if(t.debtId===b)delete t.debtId});S.debts=S.debts.filter(d=>d.id!==b);save();close();render();toast('Silindi',true);break;
     case 'deljar':confirmDel('Qutu silinsin?','dodeljar:'+b);break;
-    case 'dodeljar':snap();S.jars=S.jars.filter(j=>j.id!==b);save();close();render();toast('Silindi',true);break;
+    case 'dodeljar':snap();S.jars=S.jars.filter(j=>j.id!==b);if(S.roundup&&S.roundup.jar===b)S.roundup.on=false;save();close();render();toast('Silindi',true);break;
   }
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!sheet.hidden)close()});
@@ -1120,7 +1129,7 @@ document.addEventListener('submit',e=>{
   const amt=num(fd.get('amt'));
   if(type==='acc'){const name=(fd.get('name')||'').trim(),raw=(fd.get('amt')||'').trim(),want=num(raw);let a;
     if(f.dataset.id){a=S.accounts.find(x=>x.id===f.dataset.id);Object.assign(a,{name,ic:fd.get('ic')})}else{a={id:uid(),name,ic:fd.get('ic')};S.accounts.push(a);if(!S.lastAcc)S.lastAcc=a.id}
-    const diff=raw?Math.round((want-accBal(a.id))*100)/100:0;if(Math.abs(diff)>=0.01)S.tx.push({id:uid(),kind:diff>0?'in':'out',amt:Math.abs(diff),cat:'adj',adj:true,acc:a.id,date:TODAY,note:'Balans düzəlişi · '+name,recur:false});
+    const diff=raw?Math.round((want-accBal(a.id))*100)/100:0;if(Math.abs(diff)>=0.01)S.transfers.push({id:uid(),from:diff>0?'':a.id,to:diff>0?a.id:'',amt:Math.abs(diff),date:TODAY,setup:true});
     save();accSheet();render();toast('Hesab yadda saxlandı');return}
   if(type==='transfer'){const a=num(fd.get('amt')),fr=fd.get('from'),to=fd.get('to');if(!(a>0)){toast('Məbləği yaz');return}if(fr===to){toast('Fərqli hesablar seç');return}
     S.transfers.push({id:uid(),from:fr,to,amt:a,date:fd.get('date')||TODAY});save();close();render();toast('Köçürüldü');return}
@@ -1165,7 +1174,8 @@ document.addEventListener('submit',e=>{
     const d=c===DEBT_CAT[kind]&&fd.get('debt')?S.debts.find(x=>x.id===fd.get('debt')):null;
     if(d&&amt>debtLeft(d)+(oldOp&&oldD===d?oldOp.amt:0)+0.004){toast('Qalıqdan çox ola bilməz');return}
     if(oldD&&oldOp)oldD.ops=oldD.ops.filter(o=>o!==oldOp);delete t.debtId;
-    Object.assign(t,{amt,cat:c,date:fd.get('date')||t.date,note:(fd.get('note')||'').trim(),recur:t.recurOf?false:!!fd.get('recur')&&!d});if(fd.get('acc'))t.acc=fd.get('acc');if(t.note)remember(t.note,c);S.jars.forEach(j=>j.ops=j.ops.filter(o=>!(o.txId===t.id&&o.round)));roundUp(t);
+    Object.assign(t,{amt,cat:c,date:fd.get('date')||t.date,note:(fd.get('note')||'').trim(),recur:t.recurOf?false:!!fd.get('recur')&&!d});if(fd.get('acc'))t.acc=fd.get('acc');if(t.note)remember(t.note,c);
+    if(t.loanId){const l=S.loans.find(x=>x.id===t.loanId),pm=l&&l.payments.find(x=>x.txId===t.id);if(pm){pm.amt=t.amt;pm.date=t.date}}S.jars.forEach(j=>j.ops=j.ops.filter(o=>!(o.txId===t.id&&o.round)));roundUp(t);
     if(d){t.debtId=d.id;d.ops.push({type:'pay',amt,date:t.date,txId:t.id})}
     save();close();render();toast('Dəyişdirildi');return}
   if(type==='tx'){const kind=f.dataset.kind,c=fd.get('cat');

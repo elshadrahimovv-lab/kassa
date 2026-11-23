@@ -266,7 +266,8 @@ const JAR_IC=['🚗','✈️','🛡️','🏠','📱','🎓','💍','🎁','💰
 /* built-in categories (without "Digər") plus the ones the user created */
 const ADJ={id:'adj',ic:'⚖️',n:'Balans düzəlişi',c:'#8e8e93'};
 const allCats=k=>[...CAT[k].filter(c=>c.id!=='diger'),...((S.cats&&S.cats[k])||[])];
-const cat=(k,id)=>id==='adj'?ADJ:allCats(k).find(c=>c.id===id)||CAT[k].find(c=>c.id===id)||CAT[k][CAT[k].length-1];
+const FLOW={out:{id:'flow',ic:'🤝',n:'Borc verildi',c:'#ff9f43'},in:{id:'flow',ic:'🤝',n:'Borc alındı',c:'#ff9f43'}};
+const cat=(k,id)=>id==='flow'?FLOW[k]:id==='adj'?ADJ:allCats(k).find(c=>c.id===id)||CAT[k].find(c=>c.id===id)||CAT[k][CAT[k].length-1];
 const CUSTOM_IC=['🚬','🎓','📚','⛽','🚗','🐶','💇','🏋️','🎮','☕','🍺','👶','🛠️','💡','🧾','✈️','🎁','💻','🏦','❤️'];
 const CUSTOM_COL=['#e879f9','#38bdf8','#facc15','#fb7185','#34d399','#a78bfa','#f97316','#22d3ee','#c084fc','#84cc16'];
 
@@ -394,6 +395,7 @@ function outlook(){
   if(S.limits.total){const spent=sum(monthTx('out',0));safe=Math.min(safe,Math.max(0,S.limits.total-spent)/left)}
   return {safe,left,forecast:free-avg*(left-1),avg}}
 function unlinkTx(t){
+  if(t.debtFlow){const d=S.debts.find(x=>x.id===t.debtFlow);if(d)d.ops.forEach(o=>{if(o.txId===t.id)delete o.txId})}
   if(t.debtId){const d=S.debts.find(x=>x.id===t.debtId);if(d)d.ops=d.ops.filter(o=>o.txId!==t.id)}
   if(t.loanId){const l=S.loans.find(x=>x.id===t.loanId);if(l)l.payments=l.payments.filter(x=>x.txId!==t.id)}
   if(t.planId){const pl=S.plans.find(x=>x.id===t.planId);if(pl&&pl.paid)for(const k in pl.paid)if(pl.paid[k]===t.id)delete pl.paid[k]}
@@ -745,6 +747,9 @@ async function drawPhoto(t){const box=document.getElementById('photoBox');if(!bo
   const src=t.photo?await IDB.get(t.id).catch(()=>null):null;
   box.innerHTML=src?`<img class="photo" src="${src}" alt="Qəbz şəkli" data-act="photo:${t.id}"><button class="btn danger" style="width:100%;height:36px" data-act="delphoto:${t.id}">Şəkli sil</button>`
     :`<label class="btn" style="display:grid;place-items:center;cursor:pointer" for="f-photo">📷 Qəbz şəkli əlavə et<input type="file" id="f-photo" class="vh" accept="image/*" data-id="${t.id}"></label>`}
+function flowTx(d,amt,date){const kind=d.dir==='in'?'out':'in';
+  const t={id:uid(),kind,amt,cat:'flow',adj:true,flow:true,debtFlow:d.id,date,note:d.dir==='in'?d.name+'-ə borc verdim':d.name+'-dən borc aldım',recur:false};
+  if(S.accounts.length&&S.lastAcc)t.acc=S.lastAcc;S.tx.push(t);return t}
 function debtForm(pre){
   const names=[...new Set(S.debts.map(d=>d.name))];
   open(`<h3>Yeni borc</h3><form data-form="debt"><div class="seg" role="radiogroup" style="margin-top:0">
@@ -754,19 +759,28 @@ function debtForm(pre){
   <label class="field">Kim?<input id="f-name" name="name" list="names" required placeholder="Ad" maxlength="40" value="${esc(pre||'')}"></label><datalist id="names">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
   <div class="grid2"><label class="field">Tarix<input type="date" id="f-date" name="date" value="${TODAY}" max="${TODAY}" required></label><label class="field">Qaytarma tarixi<input type="date" id="f-due" name="due" min="${TODAY}"></label></div>
   <label class="field">Qeyd<input id="f-note" name="note" placeholder="Nə üçün?" maxlength="60"></label>
-  <div class="k" style="font-weight:500">Borc yalnız Borclar bölməsində saxlanılır, balansa təsir etmir. Qaytarılanda gəlir kimi yazılır.</div>
+  <label class="toggle"><input type="checkbox" name="flow" id="f-flow" checked><span id="flowLbl">Bu pul indi balansımdan çıxdı</span></label>
+  <div class="k" style="font-weight:400;line-height:1.45">Köhnə borcdursa (pul çoxdan verilib), işarəni götür: balans dəyişməyəcək. Bu, xərc hesabatına düşmür.</div>
   <button class="btn primary">Yadda saxla</button></form>`);
+  const f=body.querySelector('form'),lbl=f.querySelector('#flowLbl');
+  f.addEventListener('change',e=>{if(e.target.name==='dir')lbl.textContent=e.target.value==='in'?'Bu pul indi balansımdan çıxdı':'Bu pul indi balansıma gəldi'});
 }
+function debtEdit(id){const d=S.debts.find(x=>x.id===id);if(!d)return;
+  open(`<h3>Borcu düzəlt</h3><form data-form="debtedit" data-id="${d.id}"><label class="field">Ad<input id="f-name" name="name" required maxlength="40" value="${esc(d.name)}"></label>
+  <label class="field">Qaytarma tarixi<input type="date" id="f-due" name="due" value="${d.due||''}"></label>
+  <label class="field">Qeyd<input id="f-note" name="note" maxlength="60" value="${esc(d.note||'')}"></label>
+  <div class="k" style="font-weight:400">Tarixi silmək üçün sahəni boş saxla.</div><button class="btn primary">Yadda saxla</button></form>`)}
 function debtDetail(id){
   const d=S.debts.find(x=>x.id===id);if(!d)return;const left=debtLeft(d);
   const ops=[...d.ops].sort((a,b)=>b.date.localeCompare(a.date));
   open(`<h3>${esc(d.name)}</h3><div class="k">${d.dir==='in'?'Mənə borcludur':'Mən borcluyam'}${d.note?' · '+esc(d.note):''}</div>
   <div class="num" style="font-size:34px;font-weight:700;margin-top:6px;color:${isOpen(d)?(d.dir==='in'?'var(--debt)':'var(--expense)'):'var(--income)'}">${isOpen(d)?fmt(left):'Bağlanıb ✓'}</div>
   <div style="margin:10px 0 16px"><div class="stat"><span>Ümumi borc</span><b class="num">${fmt(debtLoan(d))}</b></div><div class="stat"><span>Qaytarılıb</span><b class="num in">${fmt(debtPaid(d))}</b></div>${d.due?`<div class="stat"><span>Qaytarma tarixi</span><b>${dLabel(d.due)}</b></div>`:''}</div>
-  <form data-form="debtop" data-id="${d.id}">${amountField(isOpen(d)?String(left).replace('.',','):'0')}<label class="field">Tarix<input type="date" id="f-opdate" name="opdate" value="${TODAY}" max="${TODAY}" required></label><label class="toggle"><input type="checkbox" name="astx" id="f-astx" checked>${d.dir==='in'?'Ödənişi gəlir kimi də yaz (balansa əlavə olunsun)':'Ödənişi xərc kimi də yaz (balansdan çıxılsın)'}</label>
+  <form data-form="debtop" data-id="${d.id}">${amountField(isOpen(d)?String(left).replace('.',','):'0')}<label class="field">Tarix<input type="date" id="f-opdate" name="opdate" value="${TODAY}" max="${TODAY}" required></label><label class="toggle"><input type="checkbox" name="astx" id="f-astx" checked>Balansa da yaz</label><div class="k" style="font-weight:400;line-height:1.45;margin-top:-6px">${d.dir==='in'?'Ödəniş gəlir kimi əlavə olunur, yeni borc balansdan çıxır.':'Ödəniş xərc kimi çıxılır, yeni borc balansa əlavə olunur.'}</div>
   <div class="btns"><button class="btn primary" name="op" value="pay" ${isOpen(d)?'':'disabled'}>Ödəniş əlavə et</button><button class="btn" name="op" value="loan">${d.dir==='in'?'Yenə borc ver':'Yenə borc al'}</button></div></form>
-  <h2>Tarixçə</h2><div>${ops.map(o=>`<div class="row"><span class="tile">${o.type==='loan'?'↗':'↙'}</span><span class="mid"><div class="t">${o.type==='loan'?(d.dir==='in'?'Borc verdim':'Borc aldım'):(d.dir==='in'?'Qaytardı':'Qaytardım')}</div><div class="s">${dLabel(o.date)}${o.note?' · '+esc(o.note):''}</div></span><span class="a num ${o.type==='pay'?'in':''}">${fmt(o.amt)}</span></div>`).join('')}</div>
-  <button class="btn danger" style="width:100%;margin-top:10px" data-act="deldebt:${d.id}">Bu borcu sil</button>`);
+  <h2>Tarixçə</h2><div>${ops.map(o=>`<div class="row"><span class="tile">${o.type==='loan'?'↗':'↙'}</span><span class="mid"><div class="t">${o.type==='loan'?(d.dir==='in'?'Borc verdim':'Borc aldım'):(d.dir==='in'?'Qaytardı':'Qaytardım')}</div><div class="s">${dLabel(o.date)}${o.note?' · '+esc(o.note):''}${o.txId?' · balansda':''}</div></span><span class="a num ${o.type==='pay'?'in':''}">${fmt(o.amt)}</span><button class="linkbtn" style="color:var(--expense);margin-left:10px" data-act="delop:${d.id}:${d.ops.indexOf(o)}" aria-label="Bu qeydi sil">Sil</button></div>`).join('')}</div>
+  <button class="btn" style="width:100%;margin-top:10px" data-act="debtedit:${d.id}">Borcu düzəlt</button>
+  <button class="btn danger" style="width:100%;margin-top:4px" data-act="deldebt:${d.id}">Bu borcu sil</button>`);
 }
 function jarForm(j){
   open(`<h3>${j?'Qutunu düzəlt':'Yeni qutu'}</h3><form data-form="jar" ${j?`data-id="${j.id}"`:''}><label class="field">Ad<input id="f-name" name="name" required placeholder="məs. Maşın" maxlength="30" value="${esc(j?j.name:'')}" ${j?'':'autofocus'}></label>
@@ -780,7 +794,7 @@ function jarDetail(id){
   open(`<h3>${j.ic} ${esc(j.name)}</h3><div class="num sav" style="font-size:34px;font-weight:700">${fmt(s)}</div>
   ${j.goal?`<div class="k" style="margin-top:4px">Məqsəd: ${fmt(j.goal)} · ${Math.round(s/j.goal*100)}%</div><div class="track" style="margin-top:10px"><div class="fill" style="width:${Math.min(s/j.goal,1)*100}%;background:var(--save)"></div></div><div class="advice" style="margin-top:10px;font-size:13px;color:var(--muted)">${jarAdvice(j)}</div>`:''}
   <form data-form="jarop" data-id="${j.id}" style="margin-top:16px">${amountField()}<div class="btns"><button class="btn primary" name="op" value="put">Pul qoy</button><button class="btn" name="op" value="take">Pul götür</button></div><div class="k" style="font-weight:500">Qoyduğun pul balansdan çıxılır, götürdüyün pul balansa qayıdır.</div></form>
-  <h2>Tarixçə</h2><div>${[...j.ops].sort((a,b)=>b.date.localeCompare(a.date)).map(o=>`<div class="row"><span class="tile">${o.amt>0?'↓':'↑'}</span><span class="mid"><div class="t">${o.amt>0?'Qoydum':'Götürdüm'}</div><div class="s">${dLabel(o.date)}</div></span><span class="a num ${o.amt>0?'sav':''}">${fmt(o.amt,true)}</span></div>`).join('')||'<div class="empty">Hələ əməliyyat yoxdur.</div>'}</div>
+  <h2>Tarixçə</h2><div>${[...j.ops].sort((a,b)=>b.date.localeCompare(a.date)).map(o=>`<div class="row"><span class="tile">${o.amt>0?'↓':'↑'}</span><span class="mid"><div class="t">${o.round?'Yuvarlaqlaşdırma':o.amt>0?'Qoydum':'Götürdüm'}</div><div class="s">${dLabel(o.date)}</div></span><span class="a num ${o.amt>0?'sav':''}">${fmt(o.amt,true)}</span><button class="linkbtn" style="color:var(--expense);margin-left:10px" data-act="deljop:${j.id}:${j.ops.indexOf(o)}" aria-label="Bu qeydi sil">Sil</button></div>`).join('')||'<div class="empty">Hələ əməliyyat yoxdur.</div>'}</div>
   <button class="btn" style="width:100%;margin-top:10px" data-act="editjar:${j.id}">Qutunu düzəlt</button>
   <button class="btn danger" style="width:100%;margin-top:4px" data-act="deljar:${j.id}">Qutunu sil</button>`);
 }
@@ -970,7 +984,7 @@ async function shareFile(file,title){
   const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=file.name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);return true}
 function exportCSV(){const rows=[['Tarix','Növ','Kateqoriya','Məbləğ','Qeyd','Hesab']];
   [...S.tx].sort((a,b)=>a.date.localeCompare(b.date)).forEach(t=>{const c=cat(t.kind,t.cat),a=accounts().find(x=>x.id===t.acc);
-    rows.push([t.date,t.adj?'Düzəliş':t.kind==='in'?'Gəlir':'Xərc',c.n,(t.kind==='in'?'':'-')+String(t.amt).replace('.',','),t.note||'',a?a.name:''])});
+    rows.push([t.date,t.flow?'Borc':t.adj?'Düzəliş':t.kind==='in'?'Gəlir':'Xərc',c.n,(t.kind==='in'?'':'-')+String(t.amt).replace('.',','),t.note||'',a?a.name:''])});
   const csv='﻿'+rows.map(r=>r.map(v=>/[;"\n]/.test(v)?'"'+String(v).replace(/"/g,'""')+'"':v).join(';')).join('\r\n');
   shareFile(new File([csv],`kassa-${TODAY}.csv`,{type:'text/csv'}),'Kassa cədvəli').then(ok=>ok&&toast('Cədvəl hazırdır'))}
 /* bank SMS pasted into the smart line */
@@ -1022,6 +1036,11 @@ document.addEventListener('click',e=>{
     case 'acc':accForm(S.accounts.find(x=>x.id===b));break;
     case 'delacc':snap();S.tx.forEach(t=>{if(t.acc===b)delete t.acc});S.transfers=S.transfers.filter(x=>x.from!==b&&x.to!==b);S.accounts=S.accounts.filter(x=>x.id!==b);if(S.lastAcc===b)delete S.lastAcc;save();close();render();toast('Hesab silindi',true);break;
     case 'transfer':transferForm();break;
+    case 'debtedit':debtEdit(b);break;
+    case 'delop':{const d=S.debts.find(x=>x.id===b),o=d&&d.ops[+c];if(!o)break;snap();d.ops.splice(+c,1);
+      // a payment or cash flow recorded with this entry is removed with it
+      if(o.txId)S.tx=S.tx.filter(t=>t.id!==o.txId);save();render();if(d.ops.length)debtDetail(d.id);else{S.debts=S.debts.filter(x=>x.id!==d.id);save();render();close()}toast('Silindi',true);break}
+    case 'deljop':{const j=S.jars.find(x=>x.id===b);if(!j||!j.ops[+c])break;snap();j.ops.splice(+c,1);save();render();jarDetail(j.id);toast('Silindi',true);break}
     case 'deltr':snap();S.transfers=S.transfers.filter(x=>x.id!==b);save();accSheet();render();toast('Köçürmə silindi',true);break;
     case 'photo':IDB.get(b).then(src=>{if(src)open(`<img src="${src}" alt="Qəbz şəkli" style="width:100%;border-radius:12px"><button class="btn" style="width:100%;margin-top:12px" data-act="tx:${b}">Geri</button>`)});break;
     case 'delphoto':{const t=S.tx.find(x=>x.id===b);IDB.set(b,null).catch(()=>{});if(t){delete t.photo;save();drawPhoto(t)}toast('Şəkil silindi');break}
@@ -1085,7 +1104,7 @@ document.addEventListener('click',e=>{
     case 'dodeltx':{snap();const t=S.tx.find(x=>x.id===b);if(t)unlinkTx(t)}S.tx=S.tx.filter(t=>t.id!==b);save();close();render();toast('Silindi',true);break;
     case 'stoprecur':{const t=S.tx.find(x=>x.id===b);if(t)t.recur=false;save();close();render();toast('Təkrar dayandırıldı');break}
     case 'deldebt':confirmDel('Borc silinsin?','dodeldebt:'+b);break;
-    case 'dodeldebt':snap();S.tx.forEach(t=>{if(t.debtId===b)delete t.debtId});S.debts=S.debts.filter(d=>d.id!==b);save();close();render();toast('Silindi',true);break;
+    case 'dodeldebt':snap();S.tx=S.tx.filter(t=>t.debtFlow!==b);S.tx.forEach(t=>{if(t.debtId===b)delete t.debtId});S.debts=S.debts.filter(d=>d.id!==b);save();close();render();toast('Silindi',true);break;
     case 'deljar':confirmDel('Qutu silinsin?','dodeljar:'+b);break;
     case 'dodeljar':snap();S.jars=S.jars.filter(j=>j.id!==b);if(S.roundup&&S.roundup.jar===b)S.roundup.on=false;save();close();render();toast('Silindi',true);break;
   }
@@ -1167,7 +1186,7 @@ document.addEventListener('submit',e=>{
     const diff=Math.round((amt-totals().bal)*100)/100;S.balanceSet=true;
     if(Math.abs(diff)>=0.01)S.tx.push({id:uid(),kind:diff>0?'in':'out',amt:Math.abs(diff),cat:'adj',adj:true,date:TODAY,note:'Balans düzəlişi',recur:false});
     save();close();render();toast(Math.abs(diff)>=0.01?'Balans düzəldildi':'Balans artıq düzgündür');return}
-  if(type!=='jar'&&type!=='limit'&&!(amt>0)){toast('Məbləği yaz');return}
+  if(type!=='jar'&&type!=='limit'&&type!=='debtedit'&&!(amt>0)){toast('Məbləği yaz');return}
   if(type==='recamt'){const t=S.tx.find(x=>x.id===f.dataset.id);if(t)t.recurAmt=amt;save();close();render();toast('Aylıq məbləğ dəyişdi');return}
   if(type==='tx'&&f.dataset.id){const t=S.tx.find(x=>x.id===f.dataset.id),kind=t.kind,c=fd.get('cat');
     const oldD=t.debtId?S.debts.find(x=>x.id===t.debtId):null,oldOp=oldD?oldD.ops.find(o=>o.txId===t.id):null;
@@ -1194,14 +1213,18 @@ document.addEventListener('submit',e=>{
   else if(type==='debt'){const dir=fd.get('dir'),name=(fd.get('name')||'').trim(),date=fd.get('date')||TODAY;
     let d=S.debts.find(x=>x.dir===dir&&x.name.toLowerCase()===name.toLowerCase()&&isOpen(x));
     const nt=(fd.get('note')||'').trim();
-    if(d){d.ops.push({type:'loan',amt,date,note:nt});if(!d.note&&nt)d.note=nt;if(fd.get('due'))d.due=fd.get('due')}
-    else S.debts.push({id:uid(),dir,name,due:fd.get('due')||'',note:(fd.get('note')||'').trim(),ops:[{type:'loan',amt,date}]});
+    const rec={type:'loan',amt,date,note:nt};
+    if(d){d.ops.push(rec);if(!d.note&&nt)d.note=nt;if(fd.get('due'))d.due=fd.get('due')}
+    else{d=null;const nd={id:uid(),dir,name,due:fd.get('due')||'',note:nt,ops:[rec]};S.debts.push(nd);if(fd.get('flow'))rec.txId=flowTx(nd,amt,date).id}
+    if(d&&fd.get('flow'))rec.txId=flowTx(d,amt,date).id;
     debtDir=dir;toast(d?'Borc karta əlavə olundu':'Borc yazıldı')}
   else if(type==='debtop'){const d=S.debts.find(x=>x.id===f.dataset.id);const o=op||'pay';
     if(o==='pay'&&amt>debtLeft(d)+0.004){toast('Qalıqdan çox ola bilməz');return}
     const dt=fd.get('opdate')||TODAY;const rec={type:o,amt,date:dt};
     if(o==='pay'&&fd.get('astx')){const kind=d.dir;const t={id:uid(),kind,amt,cat:DEBT_CAT[kind],date:dt,note:kind==='in'?d.name+' borcu qaytardı':d.name+' adlı şəxsə borc ödənişi',recur:false,debtId:d.id};S.tx.push(t);rec.txId=t.id}
+    if(o==='loan'&&fd.get('astx'))rec.txId=flowTx(d,amt,dt).id;
     d.ops.push(rec);toast(o==='pay'?(isOpen(d)?'Ödəniş yazıldı':'Borc bağlandı ✓'):'Borc artırıldı')}
+  else if(type==='debtedit'){const d=S.debts.find(x=>x.id===f.dataset.id);Object.assign(d,{name:(fd.get('name')||'').trim()||d.name,due:fd.get('due')||'',note:(fd.get('note')||'').trim()});save();debtDetail(d.id);render();toast('Borc yeniləndi');return}
   else if(type==='jar'&&f.dataset.id){const j=S.jars.find(x=>x.id===f.dataset.id);Object.assign(j,{name:(fd.get('name')||'').trim()||j.name,ic:fd.get('ic')||j.ic,goal:num(fd.get('goal')),due:fd.get('due')||''});toast('Qutu yeniləndi')}
   else if(type==='jar'){S.jars.push({id:uid(),name:(fd.get('name')||'').trim(),ic:fd.get('ic'),goal:num(fd.get('goal')),due:fd.get('due')||'',ops:[]});toast('Qutu yaradıldı')}
   else if(type==='jarop'||type==='jarquick'){const j=S.jars.find(x=>x.id===(f.dataset.id||fd.get('jar')));const take=op==='take';

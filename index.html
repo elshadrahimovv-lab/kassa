@@ -189,6 +189,22 @@ form{display:flex;flex-direction:column;gap:14px}
 .eye{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;color:var(--muted)}
 .eye svg{width:20px;height:20px}
 .cmp-row small{display:block;font-size:11px;opacity:.8}
+.smart{display:flex;gap:8px;margin-top:18px}
+.smart input{flex:1;min-width:0;background:var(--surface);border:1.5px solid transparent;border-radius:14px;padding:12px 14px;font-size:16px;color:var(--fg);outline:0}
+.smart input:focus{border-color:var(--accent)}
+.smart button{flex:none;padding:0 16px;border-radius:14px;background:var(--accent);color:var(--accent-ink);font-weight:600}
+.smart-prev{font-size:14px;color:var(--muted);margin-top:8px;min-height:20px;padding-left:4px}
+.smart-prev b{color:var(--fg);font-weight:600}
+.presets{display:flex;gap:8px;overflow-x:auto;margin:14px calc(-1*max(16px, env(safe-area-inset-left, 0px))) 0;padding:0 max(16px, env(safe-area-inset-left, 0px)) 2px;scrollbar-width:none}
+.presets::-webkit-scrollbar{display:none}
+.presets button{flex:none;display:flex;align-items:center;gap:6px;background:var(--surface);border-radius:99px;padding:9px 14px;font-size:15px;font-weight:500;white-space:nowrap}
+.presets button.add{color:var(--accent);font-weight:600}
+.kpad{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.kpad button{height:48px;border-radius:12px;background:var(--surface-2);font-size:22px;font-weight:500}
+.kpad button.op{color:var(--accent);font-weight:600}
+.calc{min-height:18px;font-weight:500;color:var(--muted);margin-top:-6px}
+#app .row{transition:transform .18s ease}
+#app .row.swiping{transition:none}
 @media (prefers-reduced-motion:reduce){#sheet,#scrim,.toast{transition:none}}
 @media (max-width:360px){.donutwrap{grid-template-columns:1fr;justify-items:center}.legend{width:100%}.hero .big{font-size:36px}}
 </style>
@@ -251,7 +267,10 @@ const dLabel=s=>{const k=dayDiff(TODAY,s);if(k===0)return 'Bu gün';if(k===1)ret
 const uid=()=>Math.random().toString(36).slice(2,10);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function fmt(n,sign){const neg=n<-0.004;const a=Math.abs(n);let [i,d]=a.toFixed(2).split('.');i=i.replace(/\B(?=(\d{3})+(?!\d))/g,' ');return (neg?'−':(sign&&a>0.004?'+':''))+i+(d!=='00'?','+d:'')+' ₼'}
-const num=v=>{const n=parseFloat(String(v||'').replace(/\s/g,'').replace(',','.'));return isFinite(n)?Math.round(n*100)/100:0};
+function evalAmt(v){const str=String(v||'').replace(/\s/g,'').replace(/−/g,'-').replace(/,/g,'.').replace(/[+\-]+$/,'');
+  if(!str||!/^[+\-]?[0-9.]+([+\-][0-9.]+)*$/.test(str))return NaN;
+  return (str.match(/[+\-]?[0-9.]+/g)||[]).reduce((a,x)=>a+parseFloat(x),0)}
+const num=v=>{const n=evalAmt(v);return isFinite(n)?Math.round(n*100)/100:0};
 
 /* sample data (marked as examples in the UI) */
 function sample(){
@@ -288,6 +307,7 @@ let S=null;
 try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 if(!S||S.v!==1)S=sample();
 if(!S.cats)S.cats={in:[],out:[]};
+if(!S.presets)S.presets=[];if(!S.memo)S.memo={};
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 
 /* monthly repeats: a template with recur:true gets one copy per following month */
@@ -360,6 +380,66 @@ function notices(){
   return h;
 }
 const hidden=()=>document.documentElement.classList.contains('priv');
+const SMART_HINT='Məs: “taksi 5”, “bravo 23,5”, “maaş 1500”. Klaviaturadakı 🎤 ilə səslə də demək olar.';
+/* home quick buttons (user can choose 4) */
+const QUICK_BASE={in:{l:'Gəlir',act:'add:in',cls:'in',ic:svg('in')},out:{l:'Xərc',act:'add:out',cls:'out',ic:svg('out')},debt:{l:'Borc',act:'add:debt',cls:'dbt',ic:svg('debt')},jarquick:{l:'Ehtiyata qoy',act:'add:jarquick',cls:'sav',ic:svg('save')},balance:{l:'Balans',act:'balance',cls:'in',ic:svg('scale')}};
+function quickDef(k){if(QUICK_BASE[k])return QUICK_BASE[k];
+  if(k.startsWith('p:')){const p=S.presets.find(x=>x.id===k.slice(2));if(!p)return null;const c=cat(p.kind,p.cat);return {l:p.note||c.n,act:'preset:'+p.id,cls:'',ic:`<span style="font-size:24px">${c.ic}</span>`}}return null}
+const quickKeys=()=>{const q=(S.quick||['in','out','debt','jarquick']).filter(k=>quickDef(k));return q.length?q:['in','out','debt','jarquick']};
+/* words → category: what the user wrote before, then category names, then common words */
+const norm=s=>String(s||'').toLocaleLowerCase('az').replace(/[^\p{L}\p{N}\s]/gu,' ').trim();
+const KW={neqliyyat:['taksi','taxi','bolt','uber','metro','avtobus','benzin','yanacaq','parkovka'],market:['market','bravo','araz','bazarstore','oba','bazar','çörək','ərzaq'],
+  yemek:['yemək','nahar','şam','səhər','kofe','qəhvə','kafe','restoran','burger','pizza','şaurma','dönər','kfc','mcdonalds','çay'],saglamliq:['aptek','dərman','həkim','klinika','diş','analiz'],
+  eylence:['kino','konsert','oyun','bouling','bilet','teatr'],telefon:['internet','telefon','azercell','bakcell','nar','mobil'],kommunal:['işıq','qaz','su','kommunal','kirayə','azərişıq','azəriqaz'],
+  geyim:['paltar','ayaqqabı','köynək','şalvar','geyim','gödəkçə'],maas:['maaş','əməkhaqqı'],frilans:['frilans','sifariş'],hediyye:['hədiyyə'],satis:['satış','satdım']};
+function guessCat(text,kind){
+  const words=norm(text).split(/\s+/).filter(w=>w.length>1&&!/^\d/.test(w));if(!words.length)return null;
+  const ok=id=>!kind||allCats(kind).some(c=>c.id===id);
+  const full=words.join(' ');if(S.memo[full]&&ok(S.memo[full]))return S.memo[full];
+  for(const w of words)if(S.memo[w]&&ok(S.memo[w]))return S.memo[w];
+  const list=kind?allCats(kind):[...allCats('out'),...allCats('in')];
+  for(const w of words){const c=list.find(c=>{const n=norm(c.n);return n===w||(w.length>=4&&(n.startsWith(w)||w.startsWith(n)))});if(c)return c.id}
+  for(const w of words)for(const [id,ks] of Object.entries(KW))if(ks.some(k=>w===k||(k.length>=4&&w.startsWith(k)))&&ok(id))return id;
+  return null}
+function remember(note,c){const words=norm(note).split(/\s+/).filter(w=>w.length>2&&!/^\d/.test(w));if(!words.length)return;
+  S.memo[words.join(' ')]=c;words.forEach(w=>S.memo[w]=c);const ks=Object.keys(S.memo);if(ks.length>600)ks.slice(0,ks.length-600).forEach(k=>delete S.memo[k])}
+const NUMW={sıfır:0,bir:1,iki:2,üç:3,dörd:4,beş:5,altı:6,yeddi:7,səkkiz:8,doqquz:9,on:10,iyirmi:20,otuz:30,qırx:40,əlli:50,altmış:60,yetmiş:70,səksən:80,doxsan:90};
+function parseSmart(text){
+  const toks=String(text||'').trim().split(/\s+/).filter(Boolean);let man=null,qep=null,total=0,cur=0,seen=false;const rest=[];
+  for(const raw of toks){const w=norm(raw);
+    const m=raw.replace(/₼|azn|manat/gi,'').replace(',','.').match(/^\d+(\.\d+)?$/);
+    if(m){cur+=parseFloat(m[0]);seen=true;continue}
+    if(w in NUMW){cur+=NUMW[w];seen=true;continue}
+    if(w==='yüz'){cur=(cur||1)*100;seen=true;continue}
+    if(w==='min'){total+=(cur||1)*1000;cur=0;seen=true;continue}
+    if(w==='yarım'){cur+=0.5;seen=true;continue}
+    if(w==='manat'||w==='azn'){man=(man||0)+total+cur;total=0;cur=0;continue}
+    if(w==='qəpik'){qep=(qep||0)+total+cur;total=0;cur=0;continue}
+    rest.push(raw)}
+  const amt=Math.round(((man||0)+(qep||0)/100+total+cur)*100)/100;
+  let c=guessCat(rest.join(' '));let kind=c&&!allCats('out').some(x=>x.id===c)?'in':'out';
+  // "hədiyyə" alone is ambiguous: income only when it says it was received
+  if(kind==='in'&&c==='hediyye'&&!/(aldım|gəldi|verdilər|bağışladı)/.test(norm(text))){c=null;kind='out'}
+  let note=rest.join(' ').trim();if(c&&norm(note)===norm(cat(kind,c).n))note='';
+  return {amt:seen?amt:0,cat:c,kind,note}}
+function smartPreview(){const el=document.getElementById('smartPrev'),v=document.getElementById('f-smart').value;
+  if(!v.trim()){el.innerHTML=SMART_HINT;return}
+  const r=parseSmart(v),c=r.cat?cat(r.kind,r.cat):null;
+  el.innerHTML=`${c?`<b>${c.ic} ${esc(c.n)}</b>`:'Kateqoriya: <b>seçiləcək</b>'} · ${r.amt?`<b class="num ${r.kind==='in'?'in':''}">${fmt(r.kind==='in'?r.amt:-r.amt,true)}</b>`:'məbləğ yoxdur'}${r.note?' · '+esc(r.note):''}`}
+function addTx(kind,amt,c,note,date){const t={id:uid(),kind,amt,cat:c,date:date||TODAY,note:note||'',recur:false};S.tx.push(t);if(note)remember(note,c);return t}
+function presetForm(pr){
+  const v=pr||{};open(`<h3>${pr?'Sürətli düymə':'Yeni sürətli düymə'}</h3><div class="k" style="font-weight:400;line-height:1.45">Tez-tez təkrarlanan xərc üçün. Ana səhifədə bir toxunuşla yazılır.</div>
+  <form data-form="preset" ${pr?`data-id="${pr.id}"`:''}>${amountField('',v.amt).replace(' autofocus','')}<div class="chips">${catChips('out',v.cat).replace(/<button type="button" class="chip-add"[^>]*>[^<]*<\/button>/,'')}</div>
+  <label class="field">Ad<input id="f-note" name="note" placeholder="məs. Siqaret" maxlength="24" value="${esc(v.note||'')}"></label>
+  <button class="btn primary">Yadda saxla</button>${pr?`<button type="button" class="btn danger" data-act="delpreset:${pr.id}">Düyməni sil</button>`:''}</form>`)}
+function presetList(){
+  open(`<h3>Sürətli düymələr</h3><div>${S.presets.map(p=>{const c=cat(p.kind,p.cat);return `<button class="row" data-act="editpreset:${p.id}"><span class="tile" style="${tint(c.c)}">${c.ic}</span><span class="mid"><div class="t">${esc(p.note||c.n)}</div><div class="s">${esc(c.n)}</div></span><span class="a num">${fmt(-p.amt)}</span></button>`}).join('')||'<div class="empty">Hələ sürətli düymə yoxdur.</div>'}</div>
+  <button class="btn primary" style="width:100%;margin-top:12px" data-act="newpreset">＋ Yeni düymə</button>`)}
+function quickForm(){
+  const opts=[...Object.keys(QUICK_BASE),...S.presets.map(p=>'p:'+p.id)],cur=quickKeys();
+  open(`<h3>Ana səhifə düymələri</h3><div class="k" style="font-weight:400">4 düymə seç.</div><form data-form="quick"><div>${opts.map(k=>{const q=quickDef(k);return `<label class="row pick"><input type="checkbox" name="qk" value="${k}" ${cur.includes(k)?'checked':''}><span class="tile ${q.cls}">${q.ic.replace('font-size:24px','font-size:19px')}</span><span class="mid"><div class="t">${esc(q.l)}</div></span></label>`}).join('')}</div>
+  <button class="btn primary">Yadda saxla</button></form>`);
+  body.querySelector('form').addEventListener('change',e=>{if(body.querySelectorAll('input[name=qk]:checked').length>4){e.target.checked=false;toast('Ən çox 4 düymə')}})}
 /* screens */
 function home(){
   const T=totals();const ti=sum(monthTx('in',0)),to=sum(monthTx('out',0)),dd=NOW.getDate(),upTo=k=>monthTx(k,-1).filter(t=>parse(t.date).getDate()<=dd),li=sum(upTo('in')),lo=sum(upTo('out'));
@@ -368,12 +448,10 @@ function home(){
   ${S.sample&&sampleFind().count?`<div class="sample"><span>Nümunə məlumatlar var</span><button data-act="samples">Nümunələri sil</button></div>`:''}${notices()}
   <section class="hero"><div class="lbl">İstifadə edilə bilən balans<button class="eye" data-act="hide" aria-label="${hidden()?'Balansı göstər':'Balansı gizlət'}">${svg(hidden()?'eyeoff':'eye')}</button></div><button class="big num pv" data-act="balance" aria-label="Balansı düzəlt">${fmt(T.bal)}</button>
     <button class="sub num" data-act="tab:save">+ Ehtiyatda: <span class="pv">${fmt(T.saved)}</span></button></section>
-  <div class="quick">
-    <button data-act="add:in"><span class="ic in">${svg('in')}</span>Gəlir</button>
-    <button data-act="add:out"><span class="ic out">${svg('out')}</span>Xərc</button>
-    <button data-act="add:debt"><span class="ic dbt">${svg('debt')}</span>Borc</button>
-    <button data-act="add:jarquick"><span class="ic sav">${svg('save')}</span>Ehtiyata qoy</button>
-  </div>
+  <div class="quick">${quickKeys().map(k=>{const q=quickDef(k);return q?`<button data-act="${q.act}"><span class="ic ${q.cls}">${q.ic}</span>${esc(q.l)}</button>`:''}).join('')}</div>
+  <form class="smart" data-form="smart" autocomplete="off"><input id="f-smart" name="q" placeholder="Yaz və ya de: siqaret 6" enterkeyhint="done" aria-label="Sürətli yazmaq"><button>Əlavə et</button></form>
+  <div class="smart-prev" id="smartPrev">${SMART_HINT}</div>
+  <div class="presets">${S.presets.map(p=>{const c=cat(p.kind,p.cat);return `<button data-act="preset:${p.id}">${c.ic} ${esc(p.note||c.n)} <span class="num" style="color:var(--muted)">${fmt(p.amt)}</span></button>`}).join('')}<button class="add" data-act="newpreset">＋ Sürətli düymə</button></div>
   <div class="sec"><div class="headrow"><h2>Bu ay · ${ymLabel(0)}</h2></div>
   <div class="card"><div class="split"><div><div class="k">Gəlir</div><div class="v in num pv">${fmt(ti,true)}</div></div><div><div class="k">Xərc</div><div class="v out num pv">${fmt(-to)}</div></div></div>
     <div class="cmp">
@@ -474,7 +552,9 @@ function toast(t,undo){const el=document.getElementById('toast');el.innerHTML=es
 const amountField=(ph,val)=>`<label class="amount"><input id="f-amt" name="amt" inputmode="decimal" placeholder="${ph||'0'}" value="${val!=null?String(val).replace('.',','):''}" autocomplete="off" required autofocus aria-label="Məbləğ"><span>₼</span></label>`;
 const chips=(name,list,sel)=>`<div class="chips">${list.map((c,i)=>`<label class="chip"><input type="radio" name="${name}" value="${c.id}" ${(sel?c.id===sel:i===0)?'checked':''}><span>${c.ic} ${esc(c.n)}</span></label>`).join('')}</div>`;
 
-const catChips=(kind,sel)=>allCats(kind).map((c,i)=>`<label class="chip"><input type="radio" name="cat" value="${c.id}" ${(sel?c.id===sel:i===0)?'checked':''}><span>${c.ic} ${esc(c.n)}</span></label>`).join('')+`<button type="button" class="chip-add" data-act="newcat">＋ Yeni kateqoriya</button>`;
+function catsByUse(kind){const from=off(-90),n={};S.tx.forEach(t=>{if(t.kind===kind&&t.date>=from)n[t.cat]=(n[t.cat]||0)+1});
+  return allCats(kind).map((c,i)=>({c,i})).sort((a,b)=>(n[b.c.id]||0)-(n[a.c.id]||0)||a.i-b.i).map(x=>x.c)}
+const catChips=(kind,sel)=>catsByUse(kind).map((c,i)=>`<label class="chip"><input type="radio" name="cat" value="${c.id}" ${(sel?c.id===sel:i===0)?'checked':''}><span>${c.ic} ${esc(c.n)}</span></label>`).join('')+`<button type="button" class="chip-add" data-act="newcat">＋ Yeni kateqoriya</button>`;
 const catPicker=(kind,sel)=>`<div class="chips" id="catChips">${catChips(kind,sel)}</div>
   <div class="newcat" id="newCat" hidden>
     <label class="field">Yeni kateqoriyanın adı<input id="f-catname" placeholder="${kind==='in'?'məs. Kirayə gəliri':'məs. Siqaret'}" maxlength="24" autocomplete="off"></label>
@@ -493,13 +573,19 @@ function debtPicker(kind,t){
   return `<div id="debtPick" ${t&&t.cat===DEBT_CAT[kind]?'':'hidden'}><label class="field">${kind==='in'?'Kim qaytardı?':'Kimə qaytardın?'}<select id="f-debt" name="debt">${list.map(d=>`<option value="${d.id}" ${d.id===cur?'selected':''}>${esc(d.name)} · qalıq ${fmt(debtLeft(d))}</option>`).join('')}<option value="">Borclar siyahısında yoxdur</option></select></label>
   <div class="k" style="font-weight:500;margin-top:6px">Seçdiyin şəxsin borc qalığı avtomatik azalacaq.</div></div>`;
 }
-function txForm(kind,t){
-  open(`<h3>${t?'Qeydi düzəlt':kind==='in'?'Yeni gəlir':'Yeni xərc'}</h3><form data-form="tx" data-kind="${kind}" ${t?`data-id="${t.id}"`:''}>${amountField('',t&&t.amt)}${catPicker(kind,t&&t.cat)}${debtPicker(kind,t)}
-  <div class="grid2"><label class="field">Tarix<input type="date" id="f-date" name="date" value="${t?t.date:TODAY}" max="${TODAY}" required></label><label class="field">Qeyd<input id="f-note" name="note" placeholder="İstəyə bağlı" maxlength="60" value="${esc(t?t.note:'')}"></label></div>
+const KEYS=['7','8','9','⌫','4','5','6','+','1','2','3','−',',','0','00','='];
+const keypad=()=>`<div class="kpad" aria-label="Rəqəmlər">${KEYS.map(k=>`<button type="button" data-k="${k}" class="${'+−=⌫'.includes(k)?'op':''}" ${k==='⌫'?'aria-label="Sil"':''}>${k}</button>`).join('')}</div><div class="calc num" id="calc"></div>`;
+function txForm(kind,t,pre){
+  const v=t||pre||{};
+  open(`<h3>${t?'Qeydi düzəlt':kind==='in'?'Yeni gəlir':'Yeni xərc'}</h3><form data-form="tx" data-kind="${kind}" ${t?`data-id="${t.id}"`:''}>${amountField('',v.amt).replace('inputmode="decimal"','inputmode="none"')}${keypad()}${catPicker(kind,v.cat)}${debtPicker(kind,t)}
+  <div class="grid2"><label class="field">Tarix<input type="date" id="f-date" name="date" value="${t?t.date:TODAY}" max="${TODAY}" required></label><label class="field">Qeyd<input id="f-note" name="note" placeholder="İstəyə bağlı" maxlength="60" value="${esc(v.note||'')}"></label></div>
   ${t&&t.recurOf?'':`<label class="toggle"><input type="checkbox" name="recur" id="f-recur" ${t&&t.recur?'checked':''}>Hər ay təkrarla${kind==='in'?' (məs. maaş)':' (məs. kirayə)'}</label>`}
   <button class="btn primary">Yadda saxla</button></form>`);
-  const f=body.querySelector('form'),dp=body.querySelector('#debtPick');
-  f.addEventListener('change',e=>{if(e.target.name==='cat')dp.hidden=e.target.value!==DEBT_CAT[kind]});
+  const f=body.querySelector('form'),dp=body.querySelector('#debtPick');let picked=!!(t||(pre&&pre.cat));
+  f.addEventListener('change',e=>{if(e.target.name==='cat'){picked=true;dp.hidden=e.target.value!==DEBT_CAT[kind]}});
+  // a note the user has written before brings its category back
+  f.querySelector('#f-note').addEventListener('input',e=>{if(picked)return;const c=guessCat(e.target.value,kind);
+    const r=c&&f.querySelector(`input[name=cat][value="${c}"]`);if(r){r.checked=true;dp.hidden=c!==DEBT_CAT[kind]}});
 }
 function txDetail(id){
   const t=S.tx.find(x=>x.id===id);if(!t)return;const c=cat(t.kind,t.cat);
@@ -508,7 +594,8 @@ function txDetail(id){
   <div style="margin:14px 0"><div class="stat"><span>Kateqoriya</span><b>${esc(c.n)}</b></div><div class="stat"><span>Tarix</span><b>${dLabel(t.date)}</b></div></div>
   ${tm?`<div class="card" style="background:var(--surface-2);margin-bottom:12px;padding:12px 14px"><div class="stat"><span>Hər ay təkrarlanır</span><b class="num">${fmt(tm.recurAmt??tm.amt)}</b></div><div class="stat"><span>Ayın günü</span><b>${parse(tm.date).getDate()}</b></div>
   <div class="btns" style="margin-top:8px"><button class="btn" style="background:var(--surface);height:44px;font-size:15px" data-act="recamt:${tm.id}">Məbləği dəyiş</button><button class="btn" style="background:var(--surface);height:44px;font-size:15px;color:var(--expense)" data-act="stoprecur:${tm.id}">Dayandır</button></div></div>`:''}
-  ${t.adj?'':`<button class="btn primary" style="width:100%;margin-bottom:8px" data-act="edittx:${t.id}">Düzəlt</button>`}
+  ${t.adj?'':`<button class="btn primary" style="width:100%;margin-bottom:8px" data-act="edittx:${t.id}">Düzəlt</button>
+  <div class="btns" style="margin-bottom:8px"><button class="btn" style="height:44px;font-size:15px" data-act="again:${t.id}">Bu gün yenə əlavə et</button><button class="btn" style="height:44px;font-size:15px" data-act="mkpreset:${t.id}">Sürətli düymə et</button></div>`}
   <button class="btn danger" style="width:100%" data-act="dodeltx:${t.id}">Bu qeydi sil</button>`);
 }
 function debtForm(pre){
@@ -577,6 +664,8 @@ function settings(){
   <div class="k" style="font-weight:400;margin-top:8px">Avtomatik rejimdə telefonun öz ayarına uyğun dəyişir.</div>
   <h2>Balans</h2>
   <div>${setRow('balance','scale','var(--income)','Balansı düzəlt','Tətbiqdəki balansı real pula uyğunlaşdır')}
+  ${setRow('presets','plus','var(--accent)','Sürətli düymələr',S.presets.length?S.presets.length+' düymə':'Yoxdur')}
+  ${setRow('quick','home','var(--accent)','Ana səhifə düymələri','4 düyməni özün seç')}
   ${setRow('recurs','repeat','var(--save)','Təkrarlanan ödənişlər',(()=>{const n=S.tx.filter(x=>x.recur).length;return n?n+' aktiv':'Yoxdur'})())}</div>
   <h2>Nüsxə</h2>
   <div>${setRow('export','down','var(--accent)','Ehtiyat nüsxə al',lb?'Son nüsxə: '+dLabel(lb):'Hələ nüsxə alınmayıb')}
@@ -672,6 +761,15 @@ document.addEventListener('click',e=>{
     case 'jar':jarDetail(b);break;
     case 'limit':limitForm(b);break;
     case 'all':allFeed();break;
+    case 'preset':{const pr=S.presets.find(x=>x.id===b);if(!pr)break;snap();addTx(pr.kind,pr.amt,pr.cat,pr.note);save();render();toast((pr.note||cat(pr.kind,pr.cat).n)+' · '+fmt(pr.amt)+' yazıldı',true);break}
+    case 'newpreset':presetForm();break;
+    case 'editpreset':presetForm(S.presets.find(x=>x.id===b));break;
+    case 'delpreset':S.presets=S.presets.filter(x=>x.id!==b);if(S.quick)S.quick=S.quick.filter(k=>k!=='p:'+b);save();render();presetList();toast('Düymə silindi');break;
+    case 'presets':presetList();break;
+    case 'quick':quickForm();break;
+    case 'again':{const t=S.tx.find(x=>x.id===b);if(!t)break;snap();addTx(t.kind,t.amt,t.cat,t.note);save();close();render();toast('Bu gün üçün yazıldı',true);break}
+    case 'mkpreset':{const t=S.tx.find(x=>x.id===b);if(!t)break;if(t.kind!=='out'){toast('Sürətli düymə xərclər üçündür');break}
+      S.presets.push({id:uid(),kind:'out',amt:t.amt,cat:t.cat,note:t.note||''});save();close();render();toast('Sürətli düymə yaradıldı');break}
     case 'hide':{const on=!hidden();document.documentElement.classList.toggle('priv',on);try{localStorage.setItem('kassa.hide',on?'1':'0')}catch(e){}render();break}
     case 'editjar':{const j=S.jars.find(x=>x.id===b);if(j)jarForm(j);break}
     case 'recurs':recurList();break;
@@ -685,7 +783,7 @@ document.addEventListener('click',e=>{
     case 'export':exportData();break;
     case 'samples':sampleSheet();break;
     case 'doimport':if(pendingImport){try{localStorage.setItem('kassa.v1.before-import',JSON.stringify(S))}catch(e){}
-      S=pendingImport;pendingImport=null;if(!S.cats)S.cats={in:[],out:[]};if(!S.limits)S.limits={};applyRecurring();save();close();tab='home';render();toast('Məlumatlar yükləndi')}break;
+      S=pendingImport;pendingImport=null;if(!S.cats)S.cats={in:[],out:[]};if(!S.limits)S.limits={};if(!S.presets)S.presets=[];if(!S.memo)S.memo={};applyRecurring();save();close();tab='home';render();toast('Məlumatlar yükləndi')}break;
     case 'm':mOff[b]=Math.min(0,mOff[b]+Number(c));render();break;
     case 'dir':debtDir=b;render();break;
     case 'clear':confirmDel('Nümunə məlumatlar silinsin?','doclear');break;
@@ -712,6 +810,27 @@ document.addEventListener('click',e=>{
   }
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!sheet.hidden)close()});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-k]');if(!b)return;const inp=document.getElementById('f-amt');if(!inp)return;
+  const k=b.dataset.k;let v=inp.value;
+  if(k==='⌫')v=v.slice(0,-1);else if(k==='='){const n=num(v);v=n?String(n).replace('.',','):''}
+  else if(k==='+'||k==='−'){v=v.replace(/[+−]$/,'');if(v)v+=k}
+  else if(k===','){const last=v.split(/[+−]/).pop();if(!last.includes(','))v+=(last?'':'0')+','}
+  else{const last=v.split(/[+−]/).pop();if(!(last.includes(',')&&last.split(',')[1].length>=2))v+=k}
+  inp.value=v;const c=document.getElementById('calc');c.textContent=/[+−]/.test(v)?'= '+fmt(num(v)):''});
+document.addEventListener('input',e=>{if(e.target.id==='f-smart')smartPreview()});
+/* swipe a record: left deletes (with undo), right opens it for editing */
+let sw=null,swUsed=false;
+document.addEventListener('touchstart',e=>{const r=e.target.closest('#app .row[data-act^="tx:"]');if(!r){sw=null;return}const t=e.touches[0];sw={r,x:t.clientX,y:t.clientY,dx:0,on:false}},{passive:true});
+document.addEventListener('touchmove',e=>{if(!sw)return;const t=e.touches[0],dx=t.clientX-sw.x,dy=t.clientY-sw.y;
+  if(!sw.on){if(Math.abs(dy)>10&&Math.abs(dy)>Math.abs(dx)){sw=null;return}if(Math.abs(dx)>12)sw.on=true;else return}
+  sw.dx=dx;sw.r.classList.add('swiping');sw.r.style.transform=`translateX(${dx}px)`;
+  sw.r.style.background=dx<0?'color-mix(in srgb, var(--expense) 14%, transparent)':'color-mix(in srgb, var(--accent) 14%, transparent)'},{passive:true});
+document.addEventListener('touchend',()=>{if(!sw)return;const {r,dx,on}=sw;sw=null;if(!on)return;swUsed=true;setTimeout(()=>swUsed=false,350);
+  r.classList.remove('swiping');r.style.transform='';r.style.background='';const id=r.dataset.act.slice(3);
+  if(dx<-90){const t=S.tx.find(x=>x.id===id);if(!t)return;snap();if(t.debtId){const d=S.debts.find(x=>x.id===t.debtId);if(d)d.ops=d.ops.filter(o=>o.txId!==id)}
+    S.tx=S.tx.filter(x=>x.id!==id);save();render();toast('Silindi',true)}
+  else if(dx>90){const t=S.tx.find(x=>x.id===id);if(t&&!t.adj)txForm(t.kind,t)}});
+document.addEventListener('click',e=>{if(swUsed){e.stopPropagation();e.preventDefault()}},true);
 document.addEventListener('change',e=>{if(e.target.id==='f-import'&&e.target.files[0])readImport(e.target.files[0])});
 /* the phone can keep the app open for days: start fresh when the date has changed */
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&iso(new Date())!==TODAY)location.reload()});
@@ -725,6 +844,15 @@ document.addEventListener('submit',e=>{
     S.sample=false;save();close();render();toast(picks.length+' nümunə silindi',true);return}
   const op=(e.submitter&&e.submitter.value)||'';
   const amt=num(fd.get('amt'));
+  if(type==='smart'){const r=parseSmart(fd.get('q'));
+    if(!r.amt){toast('Məbləği də yaz, məs. “taksi 5”');return}
+    if(!r.cat){txForm(r.kind,null,{amt:r.amt,note:r.note});return}
+    snap();addTx(r.kind,r.amt,r.cat,r.note);save();render();toast(cat(r.kind,r.cat).n+' · '+fmt(r.amt)+' yazıldı',true);return}
+  if(type==='quick'){const ks=fd.getAll('qk');if(!ks.length){toast('Ən az 1 düymə seç');return}S.quick=ks.slice(0,4);save();close();render();toast('Düymələr yeniləndi');return}
+  if(type==='preset'){const a=num(fd.get('amt'));if(!(a>0)){toast('Məbləği yaz');return}
+    const v={kind:'out',amt:a,cat:fd.get('cat'),note:(fd.get('note')||'').trim()};
+    if(f.dataset.id)Object.assign(S.presets.find(x=>x.id===f.dataset.id),v);else S.presets.push({id:uid(),...v});
+    save();close();render();toast('Sürətli düymə yadda saxlandı');return}
   if(type==='balance'){const raw=(fd.get('amt')||'').trim();if(!raw){toast('Məbləği yaz');return}
     const diff=Math.round((amt-totals().bal)*100)/100;S.balanceSet=true;
     if(Math.abs(diff)>=0.01)S.tx.push({id:uid(),kind:diff>0?'in':'out',amt:Math.abs(diff),cat:'adj',adj:true,date:TODAY,note:'Balans düzəlişi',recur:false});
@@ -736,7 +864,7 @@ document.addEventListener('submit',e=>{
     const d=c===DEBT_CAT[kind]&&fd.get('debt')?S.debts.find(x=>x.id===fd.get('debt')):null;
     if(d&&amt>debtLeft(d)+(oldOp&&oldD===d?oldOp.amt:0)+0.004){toast('Qalıqdan çox ola bilməz');return}
     if(oldD&&oldOp)oldD.ops=oldD.ops.filter(o=>o!==oldOp);delete t.debtId;
-    Object.assign(t,{amt,cat:c,date:fd.get('date')||t.date,note:(fd.get('note')||'').trim(),recur:t.recurOf?false:!!fd.get('recur')&&!d});
+    Object.assign(t,{amt,cat:c,date:fd.get('date')||t.date,note:(fd.get('note')||'').trim(),recur:t.recurOf?false:!!fd.get('recur')&&!d});if(t.note)remember(t.note,c);
     if(d){t.debtId=d.id;d.ops.push({type:'pay',amt,date:t.date,txId:t.id})}
     save();close();render();toast('Dəyişdirildi');return}
   if(type==='tx'){const kind=f.dataset.kind,c=fd.get('cat');
@@ -744,7 +872,7 @@ document.addEventListener('submit',e=>{
     if(d&&amt>debtLeft(d)+0.004){toast('Qalıqdan çox ola bilməz: '+fmt(debtLeft(d)));return}
     const t={id:uid(),kind,amt,cat:c,date:fd.get('date')||TODAY,note:(fd.get('note')||'').trim()||(d?(kind==='in'?d.name+' borcu qaytardı':d.name+' adlı şəxsə borc ödənişi'):''),recur:!!fd.get('recur')&&!d};
     if(d){t.debtId=d.id;d.ops.push({type:'pay',amt,date:t.date,txId:t.id})}
-    S.tx.push(t);
+    S.tx.push(t);if(t.note&&!d)remember(t.note,c);
     const k=f.dataset.kind;mOff[k]=0;toast(k==='in'?'Gəlir əlavə olundu':'Xərc əlavə olundu')}
   else if(type==='debt'){const dir=fd.get('dir'),name=(fd.get('name')||'').trim(),date=fd.get('date')||TODAY;
     let d=S.debts.find(x=>x.dir===dir&&x.name.toLowerCase()===name.toLowerCase()&&isOpen(x));

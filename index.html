@@ -174,6 +174,28 @@ form{display:flex;flex-direction:column;gap:14px}
 .stat span{color:var(--muted)}
 .toast{position:fixed;z-index:60;left:50%;bottom:calc(150px + env(safe-area-inset-bottom, 0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 18px;border-radius:99px;font-weight:700;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1}
+.toast.act{pointer-events:auto;display:flex;align-items:center;gap:14px;padding:8px 8px 8px 18px}
+.toast.act button{background:var(--accent);color:var(--accent-ink);border-radius:99px;padding:6px 12px;font-weight:600;font-size:14px}
+.notice{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--surface);border-radius:14px;padding:12px 14px;font-size:14px;margin-bottom:10px}
+.notice b{display:block;font-weight:600;font-size:15px}
+.notice span{color:var(--muted)}
+.notice .acts{display:flex;gap:12px;flex:none}
+.notice .acts button{color:var(--accent);font-weight:600;font-size:14px}
+.notice .acts button.mute{color:var(--muted);font-weight:500}
+.hero .big{cursor:pointer;display:block;text-align:left}
+#lock{position:fixed;inset:0;z-index:100;background:var(--bg);display:grid;place-items:center;padding:env(safe-area-inset-top,0px) 24px env(safe-area-inset-bottom,0px)}
+.lockin{width:100%;max-width:320px;display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center}
+.lk-title{font-size:22px;font-weight:700}
+.lk-sub{color:var(--muted);font-size:15px;min-height:20px;line-height:1.45}
+.dots{display:flex;gap:18px;margin-block:6px}
+.dots i{width:14px;height:14px;border-radius:50%;border:2px solid var(--muted)}
+.dots i.on{background:var(--fg);border-color:var(--fg)}
+.dots.err{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-10px)}50%{transform:translateX(10px)}75%{transform:translateX(-6px)}}
+.pad{display:grid;grid-template-columns:repeat(3,76px);gap:16px 24px;margin-top:6px}
+.pad button{width:76px;height:76px;border-radius:50%;background:var(--surface);font-size:30px;font-weight:400}
+.pad button.plain{background:none;font-size:15px;font-weight:500}
+.lockin .btn{width:100%}
 @media (prefers-reduced-motion:reduce){#sheet,#scrim,.toast{transition:none}}
 @media (max-width:360px){.donutwrap{grid-template-columns:1fr;justify-items:center}.legend{width:100%}.hero .big{font-size:36px}}
 </style>
@@ -186,6 +208,7 @@ form{display:flex;flex-direction:column;gap:14px}
 <div id="scrim" hidden data-act="close"></div>
 <div id="sheet" hidden role="dialog" aria-modal="true"><div class="grab"></div><div id="sheetBody"></div></div>
 <div class="toast" id="toast" role="status"></div>
+<div id="lock" hidden role="dialog" aria-modal="true" aria-label="Kilid"></div>
 
 <script>
 (function(){
@@ -201,6 +224,8 @@ const ICONS={
   gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   down:'<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
   up:'<path d="M12 15V4M7 9l5-5 5 5M5 20h14"/>',
+  lock:'<rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  scale:'<path d="M12 4v16M7 20h10M5 8h14M5 8l-2.5 6a3 3 0 0 0 5 0zM19 8l-2.5 6a3 3 0 0 0 5 0z"/>',
   trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
   l:'<path d="M15 6l-6 6 6 6"/>', r:'<path d="M9 6l6 6-6 6"/>'
 };
@@ -211,8 +236,9 @@ const CAT={
 };
 const JAR_IC=['🚗','✈️','🛡️','🏠','📱','🎓','💍','🎁','💰'];
 /* built-in categories (without "Digər") plus the ones the user created */
+const ADJ={id:'adj',ic:'⚖️',n:'Balans düzəlişi',c:'#8e8e93'};
 const allCats=k=>[...CAT[k].filter(c=>c.id!=='diger'),...((S.cats&&S.cats[k])||[])];
-const cat=(k,id)=>allCats(k).find(c=>c.id===id)||CAT[k].find(c=>c.id===id)||CAT[k][CAT[k].length-1];
+const cat=(k,id)=>id==='adj'?ADJ:allCats(k).find(c=>c.id===id)||CAT[k].find(c=>c.id===id)||CAT[k][CAT[k].length-1];
 const CUSTOM_IC=['🚬','🎓','📚','⛽','🚗','🐶','💇','🏋️','🎮','☕','🍺','👶','🛠️','💡','🧾','✈️','🎁','💻','🏦','❤️'];
 const CUSTOM_COL=['#e879f9','#38bdf8','#facc15','#fb7185','#34d399','#a78bfa','#f97316','#22d3ee','#c084fc','#84cc16'];
 
@@ -297,7 +323,7 @@ function totals(){
   const iOwe=S.debts.filter(d=>d.dir==='out').reduce((s,d)=>s+Math.max(debtLeft(d),0),0);
   return {bal:b-saved,saved,owedToMe,iOwe};
 }
-const monthTx=(kind,m)=>S.tx.filter(t=>t.kind===kind&&t.date.slice(0,7)===ym(m));
+const monthTx=(kind,m)=>S.tx.filter(t=>t.kind===kind&&!t.adj&&t.date.slice(0,7)===ym(m));
 const sum=a=>a.reduce((s,t)=>s+t.amt,0);
 function limitRows(){
   const spent=monthTx('out',0);const rows=[];
@@ -331,13 +357,20 @@ function alerts(){
   return a;
 }
 
+function notices(){
+  if(S.sample)return '';let h='';
+  if(!S.balanceSet)h+=`<div class="notice"><div><b>${S.tx.length?'Balans real pulunla eynidirmi?':'Hazırda nə qədər pulun var?'}</b><span>${S.tx.length?'Cibindəki və kartdakı pulla tutuşdur':'Balans buradan başlayacaq'}</span></div><div class="acts"><button class="mute" data-act="balok">Bağla</button><button data-act="balance">${S.tx.length?'Yoxla':'Yaz'}</button></div></div>`;
+  const lb=lastBackup(),age=lb?dayDiff(TODAY,lb):null;
+  if(S.tx.length&&(age===null||age>=30))h+=`<div class="notice"><div><b>${age===null?'Hələ ehtiyat nüsxə alınmayıb':'Son nüsxədən '+age+' gün keçib'}</b><span>Məlumatları itirməmək üçün nüsxə al</span></div><div class="acts"><button data-act="export">Nüsxə al</button></div></div>`;
+  return h;
+}
 /* screens */
 function home(){
   const T=totals();const ti=sum(monthTx('in',0)),to=sum(monthTx('out',0)),li=sum(monthTx('in',-1)),lo=sum(monthTx('out',-1));
   const mx=Math.max(ti,to,li,lo,1);const al=alerts();const f=feed().slice(0,5);
   return `<div class="top"><div class="brand">Kassa</div><button class="avatar" data-act="settings" aria-label="Ayarlar">${svg('gear')}</button></div>
-  ${S.sample&&sampleFind().count?`<div class="sample"><span>Nümunə məlumatlar var</span><button data-act="samples">Nümunələri sil</button></div>`:''}
-  <section class="hero"><div class="lbl">İstifadə edilə bilən balans</div><div class="big num">${fmt(T.bal)}</div>
+  ${S.sample&&sampleFind().count?`<div class="sample"><span>Nümunə məlumatlar var</span><button data-act="samples">Nümunələri sil</button></div>`:''}${notices()}
+  <section class="hero"><div class="lbl">İstifadə edilə bilən balans</div><button class="big num" data-act="balance" aria-label="Balansı düzəlt">${fmt(T.bal)}</button>
     <button class="sub num" data-act="tab:save">+ Ehtiyatda: ${fmt(T.saved)}</button></section>
   <div class="quick">
     <button data-act="add:in"><span class="ic in">${svg('in')}</span>Gəlir</button>
@@ -437,12 +470,16 @@ function open(html){lastFocus=document.activeElement;body.innerHTML=html;scrim.h
   requestAnimationFrame(()=>{scrim.classList.add('open');sheet.classList.add('open')});
   const f=body.querySelector('[autofocus]');if(f)setTimeout(()=>f.focus(),260)}
 function close(){scrim.classList.remove('open');sheet.classList.remove('open');setTimeout(()=>{scrim.hidden=true;sheet.hidden=true;body.innerHTML=''},230);if(lastFocus&&lastFocus.focus)lastFocus.focus()}
-function toast(t){const el=document.getElementById('toast');el.textContent=t;el.classList.add('show');clearTimeout(toast.h);toast.h=setTimeout(()=>el.classList.remove('show'),1800)}
-const amountField=(ph)=>`<label class="amount"><input id="f-amt" name="amt" inputmode="decimal" placeholder="${ph||'0'}" autocomplete="off" required autofocus aria-label="Məbləğ"><span>₼</span></label>`;
+let undoState=null;
+const snap=()=>{undoState=JSON.stringify(S)};
+function toast(t,undo){const el=document.getElementById('toast');el.innerHTML=esc(t)+(undo?'<button data-act="undo">Geri qaytar</button>':'');
+  el.classList.toggle('act',!!undo);el.classList.add('show');clearTimeout(toast.h);
+  toast.h=setTimeout(()=>{el.classList.remove('show','act');if(undo)undoState=null},undo?5000:1800)}
+const amountField=(ph,val)=>`<label class="amount"><input id="f-amt" name="amt" inputmode="decimal" placeholder="${ph||'0'}" value="${val!=null?String(val).replace('.',','):''}" autocomplete="off" required autofocus aria-label="Məbləğ"><span>₼</span></label>`;
 const chips=(name,list,sel)=>`<div class="chips">${list.map((c,i)=>`<label class="chip"><input type="radio" name="${name}" value="${c.id}" ${(sel?c.id===sel:i===0)?'checked':''}><span>${c.ic} ${esc(c.n)}</span></label>`).join('')}</div>`;
 
 const catChips=(kind,sel)=>allCats(kind).map((c,i)=>`<label class="chip"><input type="radio" name="cat" value="${c.id}" ${(sel?c.id===sel:i===0)?'checked':''}><span>${c.ic} ${esc(c.n)}</span></label>`).join('')+`<button type="button" class="chip-add" data-act="newcat">＋ Yeni kateqoriya</button>`;
-const catPicker=kind=>`<div class="chips" id="catChips">${catChips(kind)}</div>
+const catPicker=(kind,sel)=>`<div class="chips" id="catChips">${catChips(kind,sel)}</div>
   <div class="newcat" id="newCat" hidden>
     <label class="field">Yeni kateqoriyanın adı<input id="f-catname" placeholder="${kind==='in'?'məs. Kirayə gəliri':'məs. Siqaret'}" maxlength="24" autocomplete="off"></label>
     <div class="chips">${CUSTOM_IC.map((ic,i)=>`<label class="chip"><input type="radio" name="catic" value="${ic}" ${i===0?'checked':''}><span style="font-size:20px;padding:6px 10px">${ic}</span></label>`).join('')}</div>
@@ -455,15 +492,15 @@ function manageCats(kind){
   <button class="btn" style="width:100%;margin-top:12px" data-act="add:${kind}">Geri</button>`);
 }
 const DEBT_CAT={in:'borc',out:'borcode'};
-function debtPicker(kind){
-  const list=S.debts.filter(d=>d.dir===kind&&isOpen(d));
-  return `<div id="debtPick" hidden><label class="field">${kind==='in'?'Kim qaytardı?':'Kimə qaytardın?'}<select id="f-debt" name="debt">${list.map(d=>`<option value="${d.id}">${esc(d.name)} · qalıq ${fmt(debtLeft(d))}</option>`).join('')}<option value="">Borclar siyahısında yoxdur</option></select></label>
+function debtPicker(kind,t){
+  const cur=t&&t.debtId,list=S.debts.filter(d=>d.dir===kind&&(isOpen(d)||d.id===cur));
+  return `<div id="debtPick" ${t&&t.cat===DEBT_CAT[kind]?'':'hidden'}><label class="field">${kind==='in'?'Kim qaytardı?':'Kimə qaytardın?'}<select id="f-debt" name="debt">${list.map(d=>`<option value="${d.id}" ${d.id===cur?'selected':''}>${esc(d.name)} · qalıq ${fmt(debtLeft(d))}</option>`).join('')}<option value="">Borclar siyahısında yoxdur</option></select></label>
   <div class="k" style="font-weight:500;margin-top:6px">Seçdiyin şəxsin borc qalığı avtomatik azalacaq.</div></div>`;
 }
-function txForm(kind){
-  open(`<h3>${kind==='in'?'Yeni gəlir':'Yeni xərc'}</h3><form data-form="tx" data-kind="${kind}">${amountField()}${catPicker(kind)}${debtPicker(kind)}
-  <div class="grid2"><label class="field">Tarix<input type="date" id="f-date" name="date" value="${TODAY}" max="${TODAY}" required></label><label class="field">Qeyd<input id="f-note" name="note" placeholder="İstəyə bağlı" maxlength="60"></label></div>
-  <label class="toggle"><input type="checkbox" name="recur" id="f-recur">Hər ay təkrarla${kind==='in'?' (məs. maaş)':' (məs. kirayə)'}</label>
+function txForm(kind,t){
+  open(`<h3>${t?'Qeydi düzəlt':kind==='in'?'Yeni gəlir':'Yeni xərc'}</h3><form data-form="tx" data-kind="${kind}" ${t?`data-id="${t.id}"`:''}>${amountField('',t&&t.amt)}${catPicker(kind,t&&t.cat)}${debtPicker(kind,t)}
+  <div class="grid2"><label class="field">Tarix<input type="date" id="f-date" name="date" value="${t?t.date:TODAY}" max="${TODAY}" required></label><label class="field">Qeyd<input id="f-note" name="note" placeholder="İstəyə bağlı" maxlength="60" value="${esc(t?t.note:'')}"></label></div>
+  ${t&&t.recurOf?'':`<label class="toggle"><input type="checkbox" name="recur" id="f-recur" ${t&&t.recur?'checked':''}>Hər ay təkrarla${kind==='in'?' (məs. maaş)':' (məs. kirayə)'}</label>`}
   <button class="btn primary">Yadda saxla</button></form>`);
   const f=body.querySelector('form'),dp=body.querySelector('#debtPick');
   f.addEventListener('change',e=>{if(e.target.name==='cat')dp.hidden=e.target.value!==DEBT_CAT[kind]});
@@ -472,8 +509,9 @@ function txDetail(id){
   const t=S.tx.find(x=>x.id===id);if(!t)return;const c=cat(t.kind,t.cat);
   open(`<h3>${c.ic} ${esc(t.note||c.n)}</h3><div class="big num ${t.kind==='in'?'in':'out'}" style="font-size:34px;font-weight:700">${fmt(t.kind==='in'?t.amt:-t.amt,true)}</div>
   <div style="margin:14px 0"><div class="stat"><span>Kateqoriya</span><b>${esc(c.n)}</b></div><div class="stat"><span>Tarix</span><b>${dLabel(t.date)}</b></div>${t.recur||t.recurOf?'<div class="stat"><span>Təkrar</span><b>Hər ay</b></div>':''}</div>
+  ${t.adj?'':`<button class="btn primary" style="width:100%;margin-bottom:8px" data-act="edittx:${t.id}">Düzəlt</button>`}
   ${t.recur?`<button class="btn" style="width:100%;margin-bottom:8px" data-act="stoprecur:${t.id}">Təkrarı dayandır</button>`:''}
-  <button class="btn danger" style="width:100%" data-act="deltx:${t.id}">Bu qeydi sil</button>`);
+  <button class="btn danger" style="width:100%" data-act="dodeltx:${t.id}">Bu qeydi sil</button>`);
 }
 function debtForm(pre){
   const names=[...new Set(S.debts.map(d=>d.name))];
@@ -537,7 +575,11 @@ function settings(){
   <h2>Görünüş</h2>
   <div class="seg seg3" role="group">${[['auto','Avtomatik'],['light','Açıq'],['dark','Tünd']].map(([k,l])=>`<button data-act="theme:${k}" aria-pressed="${t===k}">${l}</button>`).join('')}</div>
   <div class="k" style="font-weight:400;margin-top:8px">Avtomatik rejimdə telefonun öz ayarına uyğun dəyişir.</div>
-  <h2>Məlumatlar</h2>
+  <h2>Təhlükəsizlik</h2>
+  <div>${setRow('pin','lock','var(--accent)','PIN kod',getPin()?'Aktivdir':'Söndürülüb')}</div>
+  <h2>Balans</h2>
+  <div>${setRow('balance','scale','var(--income)','Balansı düzəlt','Tətbiqdəki balansı real pula uyğunlaşdır')}</div>
+  <h2>Nüsxə</h2>
   <div>${setRow('export','down','var(--accent)','Ehtiyat nüsxə al',lb?'Son nüsxə: '+dLabel(lb):'Hələ nüsxə alınmayıb')}
   ${setRow('','up','var(--save)','Nüsxədən geri yüklə','Əvvəl saxladığın fayldan','<input type="file" id="f-import" class="vh" accept=".json,application/json">')}
   ${n?setRow('samples','trash','var(--expense)','Nümunə məlumatları sil',n+' nümunə qeyd tapıldı'):''}</div>
@@ -590,13 +632,70 @@ function sampleSheet(){
   ${m.lim.length?`<h2>Limitlər · ${m.lim.length}</h2><div>`+m.lim.map(k=>item('lim:'+k,'Σ','var(--accent)',(k==='total'?'Ümumi aylıq':cat('out',k).n)+' limiti','Aylıq limit',S.limits[k])).join('')+'</div>':''}
   <button class="btn primary" style="background:var(--expense)">Seçilənləri sil</button></form>`);
 }
+function balanceForm(){
+  const T=totals(),first=!S.tx.length;
+  open(`<h3>${first?'Hazırda nə qədər pulun var?':'Balansı düzəlt'}</h3>
+  <div class="k" style="font-weight:400;line-height:1.45">${first?'Cibindəki nağd pulu və kartlardakı pulu topla. Ehtiyat qutularındakı pulu daxil etmə.':'Cibindəki və kartlardakı real pulu yaz (ehtiyat qutuları xaric). Fərq “Balans düzəlişi” kimi yazılacaq və gəlir və xərc hesabatına düşməyəcək.'}</div>
+  <form data-form="balance">${amountField(String(Math.round(T.bal*100)/100).replace('.',','))}
+  ${first?'':`<div class="k" style="font-weight:400">Tətbiqdə indi: <b class="num">${fmt(T.bal)}</b></div>`}
+  <button class="btn primary">Yadda saxla</button></form>`);
+}
+/* PIN lock: a privacy screen; the PIN itself is stored only as a salted hash */
+const PINKEY='kassa.pin';
+const getPin=()=>{try{return JSON.parse(localStorage.getItem(PINKEY))}catch(e){return null}};
+async function hashPin(pin,salt){const d=new TextEncoder().encode(salt+':'+pin);
+  if(window.crypto&&crypto.subtle){const h=await crypto.subtle.digest('SHA-256',d);return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('')}
+  let x=7;for(const c of d)x=(x*31+c)|0;return 'h'+x}
+const checkPin=async pin=>{const P=getPin();return !!P&&await hashPin(pin,P.salt)===P.hash};
+async function storePin(pin){const salt=[...crypto.getRandomValues(new Uint8Array(8))].map(b=>b.toString(16).padStart(2,'0')).join('');
+  try{localStorage.setItem(PINKEY,JSON.stringify({salt,hash:await hashPin(pin,salt)}))}catch(e){}}
+const lockEl=document.getElementById('lock');let pinCb=null,pinBuf='',hiddenAt=0;
+function pinPad(title,sub,cb,opts){
+  opts=opts||{};pinCb=cb;pinBuf='';lockEl.hidden=false;
+  lockEl.innerHTML=`<div class="lockin"><div class="lk-title">${title}</div><div class="lk-sub" id="lkSub">${sub}</div>
+  <div class="dots" id="dots">${'<i></i>'.repeat(4)}</div>
+  <div class="pad">${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-pin="${n}">${n}</button>`).join('')}
+  <button class="plain" data-pin="x" ${opts.cancel?'':'style="visibility:hidden"'}>Ləğv et</button><button data-pin="0">0</button><button class="plain" data-pin="b" aria-label="Sil" style="font-size:24px">⌫</button></div>
+  ${opts.forgot?'<button class="linkbtn" data-pin="f">PIN-i unutmusan?</button>':''}</div>`;
+}
+const dots=()=>document.querySelectorAll('#dots i').forEach((d,i)=>d.classList.toggle('on',i<pinBuf.length));
+function pinFail(msg){const d=document.getElementById('dots');pinBuf='';dots();document.getElementById('lkSub').textContent=msg;d.classList.remove('err');void d.offsetWidth;d.classList.add('err')}
+const unlockPad=()=>pinPad('Kassa','PIN kodu daxil et',async v=>{if(await checkPin(v))lockEl.hidden=true;else pinFail('PIN səhvdir, yenidən yaz')},{forgot:true});
+function pinForgot(){
+  lockEl.innerHTML=`<div class="lockin"><div class="lk-title">PIN-i unutmusan?</div>
+  <div class="lk-sub">PIN yalnız bu telefonda saxlanılır və bərpa olunmur. Tətbiqə qayıtmağın yolu ehtiyat nüsxədir: indiki məlumatlar silinəcək və nüsxədəki məlumatlar yüklənəcək. PIN söndürüləcək.</div>
+  <label class="btn primary" style="display:grid;place-items:center;cursor:pointer" for="f-restore">Nüsxədən bərpa et<input type="file" id="f-restore" class="vh" accept=".json,application/json"></label>
+  <button class="btn" data-pin="back">Geri</button></div>`;
+}
+function restoreFromLock(file){
+  const r=new FileReader();r.onload=()=>{let o;try{o=JSON.parse(r.result)}catch(e){toast('Fayl oxunmadı');return}
+    const d=o&&o.app==='kassa'?o.data:o;
+    if(!d||d.v!==1||!Array.isArray(d.tx)||!Array.isArray(d.debts)||!Array.isArray(d.jars)){toast('Bu fayl Kassa nüsxəsi deyil');return}
+    try{localStorage.removeItem(PINKEY)}catch(e){}
+    S=d;if(!S.cats)S.cats={in:[],out:[]};if(!S.limits)S.limits={};applyRecurring();save();lockEl.hidden=true;tab='home';render();toast('Nüsxədən bərpa olundu')};
+  r.readAsText(file);
+}
+function pinSettings(){
+  if(!getPin()){let first='';
+    pinPad('Yeni PIN','4 rəqəmli PIN kod seç',v=>{
+      if(!first){first=v;pinBuf='';dots();document.getElementById('lkSub').textContent='PIN-i təkrar yaz';return}
+      if(v!==first){first='';pinFail('Uyğun gəlmədi, yenidən seç');return}
+      storePin(v).then(()=>{lockEl.hidden=true;settings();toast('PIN qoyuldu')})},{cancel:true});return}
+  open(`<h3>PIN kod</h3><div class="k" style="font-weight:400;line-height:1.45;margin-bottom:14px">Tətbiq açılanda və 30 saniyədən çox arxa fonda qalanda PIN soruşulur.</div>
+  <div class="stack"><button class="btn" data-act="pinchange">PIN-i dəyiş</button><button class="btn danger" data-act="pinoff">PIN-i söndür</button></div>`);
+}
+function pinVerifyThen(fn){pinPad('Kassa','Cari PIN kodu daxil et',async v=>{if(await checkPin(v))fn();else pinFail('PIN səhvdir')},{cancel:true})}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-pin]');if(!b)return;const k=b.dataset.pin;
+  if(k==='x'){lockEl.hidden=true;return}if(k==='f'){pinForgot();return}if(k==='back'){unlockPad();return}
+  if(k==='b'){pinBuf=pinBuf.slice(0,-1);dots();return}
+  if(pinBuf.length>=4)return;pinBuf+=k;dots();if(pinBuf.length===4){const v=pinBuf;setTimeout(()=>pinCb&&pinCb(v),120)}});
 function allFeed(){
   const f=feed();let h='',last='';
   f.forEach(x=>{if(x.date!==last){h+=`<div class="daylbl">${dLabel(x.date)}</div>`;last=x.date}h+=rowHTML(x)});
   open(`<h3>Bütün əməliyyatlar</h3>${h}`);
 }
 /* a confirm step inside the sheet, since browser dialogs are unavailable */
-function confirmDel(text,act){open(`<h3>${text}</h3><div class="k" style="margin-bottom:16px">Bu əməliyyat geri qaytarılmır.</div><div class="btns"><button class="btn" data-act="close">Ləğv et</button><button class="btn primary" style="background:var(--expense);color:var(--bg)" data-act="${act}">Sil</button></div>`)}
+function confirmDel(text,act){open(`<h3>${text}</h3><div class="k" style="margin-bottom:16px;font-weight:400">Silindikdən sonra 5 saniyə ərzində geri qaytara bilərsən.</div><div class="btns"><button class="btn" data-act="close">Ləğv et</button><button class="btn primary" style="background:var(--expense);color:var(--bg)" data-act="${act}">Sil</button></div>`)}
 
 /* events */
 document.addEventListener('click',e=>{
@@ -612,6 +711,13 @@ document.addEventListener('click',e=>{
     case 'jar':jarDetail(b);break;
     case 'limit':limitForm(b);break;
     case 'all':allFeed();break;
+    case 'balance':balanceForm();break;
+    case 'balok':S.balanceSet=true;save();render();break;
+    case 'edittx':{const t=S.tx.find(x=>x.id===b);if(t)txForm(t.kind,t);break}
+    case 'undo':if(undoState){S=JSON.parse(undoState);undoState=null;save();close();render();toast('Geri qaytarıldı')}break;
+    case 'pin':pinSettings();break;
+    case 'pinchange':close();pinVerifyThen(()=>{try{localStorage.removeItem(PINKEY)}catch(e){}pinSettings()});break;
+    case 'pinoff':close();pinVerifyThen(()=>{try{localStorage.removeItem(PINKEY)}catch(e){}lockEl.hidden=true;toast('PIN söndürüldü')});break;
     case 'settings':settings();break;
     case 'theme':setTheme(b);settings();break;
     case 'export':exportData();break;
@@ -633,31 +739,45 @@ document.addEventListener('click',e=>{
       document.getElementById('newCat').hidden=true;inp.value='';break}
     case 'mycats':manageCats(b);break;
     case 'delcat':confirmDel('Kateqoriya silinsin?','dodelcat:'+b+':'+c);break;
-    case 'dodelcat':S.cats[b]=S.cats[b].filter(x=>x.id!==c);S.tx.forEach(t=>{if(t.kind===b&&t.cat===c)t.cat='diger'});delete S.limits[c];save();render();manageCats(b);toast('Silindi');break;
+    case 'dodelcat':snap();S.cats[b]=S.cats[b].filter(x=>x.id!==c);S.tx.forEach(t=>{if(t.kind===b&&t.cat===c)t.cat='diger'});delete S.limits[c];save();render();manageCats(b);toast('Silindi',true);break;
     case 'deltx':confirmDel('Qeyd silinsin?','dodeltx:'+b);break;
-    case 'dodeltx':{const t=S.tx.find(x=>x.id===b);if(t&&t.debtId){const d=S.debts.find(x=>x.id===t.debtId);if(d)d.ops=d.ops.filter(o=>o.txId!==b)}}S.tx=S.tx.filter(t=>t.id!==b);save();close();render();toast('Silindi');break;
+    case 'dodeltx':{snap();const t=S.tx.find(x=>x.id===b);if(t&&t.debtId){const d=S.debts.find(x=>x.id===t.debtId);if(d)d.ops=d.ops.filter(o=>o.txId!==b)}}S.tx=S.tx.filter(t=>t.id!==b);save();close();render();toast('Silindi',true);break;
     case 'stoprecur':{const t=S.tx.find(x=>x.id===b);if(t)t.recur=false;save();close();render();toast('Təkrar dayandırıldı');break}
     case 'deldebt':confirmDel('Borc silinsin?','dodeldebt:'+b);break;
-    case 'dodeldebt':S.tx.forEach(t=>{if(t.debtId===b)delete t.debtId});S.debts=S.debts.filter(d=>d.id!==b);save();close();render();toast('Silindi');break;
+    case 'dodeldebt':snap();S.tx.forEach(t=>{if(t.debtId===b)delete t.debtId});S.debts=S.debts.filter(d=>d.id!==b);save();close();render();toast('Silindi',true);break;
     case 'deljar':confirmDel('Qutu silinsin?','dodeljar:'+b);break;
-    case 'dodeljar':S.jars=S.jars.filter(j=>j.id!==b);save();close();render();toast('Silindi');break;
+    case 'dodeljar':snap();S.jars=S.jars.filter(j=>j.id!==b);save();close();render();toast('Silindi',true);break;
   }
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!sheet.hidden)close()});
-document.addEventListener('change',e=>{if(e.target.id==='f-import'&&e.target.files[0])readImport(e.target.files[0])});
+document.addEventListener('change',e=>{if(e.target.id==='f-import'&&e.target.files[0])readImport(e.target.files[0]);if(e.target.id==='f-restore'&&e.target.files[0])restoreFromLock(e.target.files[0])});
 /* the phone can keep the app open for days: start fresh when the date has changed */
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&iso(new Date())!==TODAY)location.reload()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){hiddenAt=Date.now();return}
+  if(iso(new Date())!==TODAY){location.reload();return}
+  if(getPin()&&lockEl.hidden&&Date.now()-hiddenAt>30000)unlockPad()});
 document.addEventListener('submit',e=>{
   e.preventDefault();const f=e.target,fd=new FormData(f),type=f.dataset.form;
-  if(type==='samples'){const picks=fd.getAll('pick').map(v=>v.split(':'));const ids=k=>new Set(picks.filter(p=>p[0]===k).map(p=>p[1]));
+  if(type==='samples'){snap();const picks=fd.getAll('pick').map(v=>v.split(':'));const ids=k=>new Set(picks.filter(p=>p[0]===k).map(p=>p[1]));
     const tx=ids('tx'),db=ids('debt'),jr=ids('jar'),lm=ids('lim');
     S.tx.filter(t=>tx.has(t.id)&&t.debtId).forEach(t=>{const d=S.debts.find(x=>x.id===t.debtId);if(d)d.ops=d.ops.filter(o=>o.txId!==t.id)});
     S.tx=S.tx.filter(t=>!tx.has(t.id));S.tx.forEach(t=>{if(db.has(t.debtId))delete t.debtId});
     S.debts=S.debts.filter(d=>!db.has(d.id));S.jars=S.jars.filter(j=>!jr.has(j.id));lm.forEach(k=>delete S.limits[k]);
-    S.sample=false;save();close();render();toast(picks.length+' nümunə silindi');return}
+    S.sample=false;save();close();render();toast(picks.length+' nümunə silindi',true);return}
   const op=(e.submitter&&e.submitter.value)||'';
   const amt=num(fd.get('amt'));
+  if(type==='balance'){const raw=(fd.get('amt')||'').trim();if(!raw){toast('Məbləği yaz');return}
+    const diff=Math.round((amt-totals().bal)*100)/100;S.balanceSet=true;
+    if(Math.abs(diff)>=0.01)S.tx.push({id:uid(),kind:diff>0?'in':'out',amt:Math.abs(diff),cat:'adj',adj:true,date:TODAY,note:'Balans düzəlişi',recur:false});
+    save();close();render();toast(Math.abs(diff)>=0.01?'Balans düzəldildi':'Balans artıq düzgündür');return}
   if(type!=='jar'&&type!=='limit'&&!(amt>0)){toast('Məbləği yaz');return}
+  if(type==='tx'&&f.dataset.id){const t=S.tx.find(x=>x.id===f.dataset.id),kind=t.kind,c=fd.get('cat');
+    const oldD=t.debtId?S.debts.find(x=>x.id===t.debtId):null,oldOp=oldD?oldD.ops.find(o=>o.txId===t.id):null;
+    const d=c===DEBT_CAT[kind]&&fd.get('debt')?S.debts.find(x=>x.id===fd.get('debt')):null;
+    if(d&&amt>debtLeft(d)+(oldOp&&oldD===d?oldOp.amt:0)+0.004){toast('Qalıqdan çox ola bilməz');return}
+    if(oldD&&oldOp)oldD.ops=oldD.ops.filter(o=>o!==oldOp);delete t.debtId;
+    Object.assign(t,{amt,cat:c,date:fd.get('date')||t.date,note:(fd.get('note')||'').trim(),recur:t.recurOf?false:!!fd.get('recur')&&!d});
+    if(d){t.debtId=d.id;d.ops.push({type:'pay',amt,date:t.date,txId:t.id})}
+    save();close();render();toast('Dəyişdirildi');return}
   if(type==='tx'){const kind=f.dataset.kind,c=fd.get('cat');
     const d=c===DEBT_CAT[kind]&&fd.get('debt')?S.debts.find(x=>x.id===fd.get('debt')):null;
     if(d&&amt>debtLeft(d)+0.004){toast('Qalıqdan çox ola bilməz: '+fmt(debtLeft(d)));return}
@@ -683,6 +803,7 @@ document.addEventListener('submit',e=>{
   else if(type==='limit'){const k=fd.get('cat');if(amt>0)S.limits[k]=amt;else delete S.limits[k];toast(amt>0?'Limit qoyuldu':'Limit silindi')}
   save();close();render();
 });
+if(getPin())unlockPad();
 render();syncThemeColor();
 })();
 </script>

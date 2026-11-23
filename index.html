@@ -12,6 +12,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<script>try{if(localStorage.getItem("kassa.hide")==="1")document.documentElement.classList.add("priv")}catch(e){}</script>
 <script>try{var t=localStorage.getItem("kassa.theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
 <style>
 /* Layout: one phone-width column, bank-app style — big balance on top, dark cards, fixed 5-tab bar at the bottom, bottom sheets for input */
@@ -183,6 +184,11 @@ form{display:flex;flex-direction:column;gap:14px}
 .notice .acts button{color:var(--accent);font-weight:600;font-size:14px}
 .notice .acts button.mute{color:var(--muted);font-weight:500}
 .hero .big{cursor:pointer;display:block;text-align:left}
+.priv .pv{filter:blur(10px)}
+.hero .lbl{display:flex;align-items:center;gap:8px}
+.eye{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;color:var(--muted)}
+.eye svg{width:20px;height:20px}
+.cmp-row small{display:block;font-size:11px;opacity:.8}
 @media (prefers-reduced-motion:reduce){#sheet,#scrim,.toast{transition:none}}
 @media (max-width:360px){.donutwrap{grid-template-columns:1fr;justify-items:center}.legend{width:100%}.hero .big{font-size:36px}}
 </style>
@@ -212,6 +218,9 @@ const ICONS={
   up:'<path d="M12 15V4M7 9l5-5 5 5M5 20h14"/>',
   lock:'<rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   scale:'<path d="M12 4v16M7 20h10M5 8h14M5 8l-2.5 6a3 3 0 0 0 5 0zM19 8l-2.5 6a3 3 0 0 0 5 0z"/>',
+  eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  eyeoff:'<path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3 3.9M6.6 6.6A17 17 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 4.3-1M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
+  repeat:'<path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3"/>',
   trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
   l:'<path d="M15 6l-6 6 6 6"/>', r:'<path d="M9 6l6 6-6 6"/>'
 };
@@ -290,7 +299,7 @@ function applyRecurring(){
       if(date<=t.date.slice(0,7)+'-31'||date>TODAY)continue;
       const key=date.slice(0,7);
       if(!S.tx.some(x=>x.recurOf===t.id&&x.date.slice(0,7)===key))
-        S.tx.push({...t,id:uid(),date,recur:false,recurOf:t.id});
+        S.tx.push({...t,amt:t.recurAmt??t.amt,recurAmt:undefined,id:uid(),date,recur:false,recurOf:t.id});
     }
   });
 }
@@ -350,14 +359,15 @@ function notices(){
   if(S.tx.length&&(age===null||age>=30))h+=`<div class="notice"><div><b>${age===null?'Hələ ehtiyat nüsxə alınmayıb':'Son nüsxədən '+age+' gün keçib'}</b><span>Məlumatları itirməmək üçün nüsxə al</span></div><div class="acts"><button data-act="export">Nüsxə al</button></div></div>`;
   return h;
 }
+const hidden=()=>document.documentElement.classList.contains('priv');
 /* screens */
 function home(){
-  const T=totals();const ti=sum(monthTx('in',0)),to=sum(monthTx('out',0)),li=sum(monthTx('in',-1)),lo=sum(monthTx('out',-1));
+  const T=totals();const ti=sum(monthTx('in',0)),to=sum(monthTx('out',0)),dd=NOW.getDate(),upTo=k=>monthTx(k,-1).filter(t=>parse(t.date).getDate()<=dd),li=sum(upTo('in')),lo=sum(upTo('out'));
   const mx=Math.max(ti,to,li,lo,1);const al=alerts();const f=feed().slice(0,5);
   return `<div class="top"><div class="brand">Kassa</div><button class="avatar" data-act="settings" aria-label="Ayarlar">${svg('gear')}</button></div>
   ${S.sample&&sampleFind().count?`<div class="sample"><span>Nümunə məlumatlar var</span><button data-act="samples">Nümunələri sil</button></div>`:''}${notices()}
-  <section class="hero"><div class="lbl">İstifadə edilə bilən balans</div><button class="big num" data-act="balance" aria-label="Balansı düzəlt">${fmt(T.bal)}</button>
-    <button class="sub num" data-act="tab:save">+ Ehtiyatda: ${fmt(T.saved)}</button></section>
+  <section class="hero"><div class="lbl">İstifadə edilə bilən balans<button class="eye" data-act="hide" aria-label="${hidden()?'Balansı göstər':'Balansı gizlət'}">${svg(hidden()?'eyeoff':'eye')}</button></div><button class="big num pv" data-act="balance" aria-label="Balansı düzəlt">${fmt(T.bal)}</button>
+    <button class="sub num" data-act="tab:save">+ Ehtiyatda: <span class="pv">${fmt(T.saved)}</span></button></section>
   <div class="quick">
     <button data-act="add:in"><span class="ic in">${svg('in')}</span>Gəlir</button>
     <button data-act="add:out"><span class="ic out">${svg('out')}</span>Xərc</button>
@@ -365,10 +375,10 @@ function home(){
     <button data-act="add:jarquick"><span class="ic sav">${svg('save')}</span>Ehtiyata qoy</button>
   </div>
   <div class="sec"><div class="headrow"><h2>Bu ay · ${ymLabel(0)}</h2></div>
-  <div class="card"><div class="split"><div><div class="k">Gəlir</div><div class="v in num">${fmt(ti,true)}</div></div><div><div class="k">Xərc</div><div class="v out num">${fmt(-to)}</div></div></div>
+  <div class="card"><div class="split"><div><div class="k">Gəlir</div><div class="v in num pv">${fmt(ti,true)}</div></div><div><div class="k">Xərc</div><div class="v out num pv">${fmt(-to)}</div></div></div>
     <div class="cmp">
-      <div class="cmp-row"><span>Bu ay</span><div style="display:grid;gap:3px"><div class="track"><div class="fill" style="width:${ti/mx*100}%;background:var(--income)"></div></div><div class="track"><div class="fill" style="width:${to/mx*100}%;background:var(--expense)"></div></div></div><span class="val num">${fmt(ti-to,true)}</span></div>
-      <div class="cmp-row"><span>Keçən ay</span><div style="display:grid;gap:3px"><div class="track"><div class="fill" style="width:${li/mx*100}%;background:var(--income);opacity:.5"></div></div><div class="track"><div class="fill" style="width:${lo/mx*100}%;background:var(--expense);opacity:.5"></div></div></div><span class="val num">${fmt(li-lo,true)}</span></div>
+      <div class="cmp-row"><span>Bu ay<small>1–${dd}</small></span><div style="display:grid;gap:3px"><div class="track"><div class="fill" style="width:${ti/mx*100}%;background:var(--income)"></div></div><div class="track"><div class="fill" style="width:${to/mx*100}%;background:var(--expense)"></div></div></div><span class="val num pv">${fmt(ti-to,true)}</span></div>
+      <div class="cmp-row"><span>Keçən ay<small>1–${dd}</small></span><div style="display:grid;gap:3px"><div class="track"><div class="fill" style="width:${li/mx*100}%;background:var(--income);opacity:.5"></div></div><div class="track"><div class="fill" style="width:${lo/mx*100}%;background:var(--expense);opacity:.5"></div></div></div><span class="val num pv">${fmt(li-lo,true)}</span></div>
     </div></div></div>
   ${al.length?`<div class="sec"><div class="headrow"><h2>Diqqət</h2></div><div class="stack">${al.map(x=>`<div class="alert"><span class="dot" style="background:${x.c}"></span><span>${x.t}</span></div>`).join('')}</div></div>`:''}
   <div class="sec"><div class="headrow"><h2>Son əməliyyatlar</h2>${f.length?'<button class="linkbtn" data-act="all">Hamısı</button>':''}</div>
@@ -493,10 +503,12 @@ function txForm(kind,t){
 }
 function txDetail(id){
   const t=S.tx.find(x=>x.id===id);if(!t)return;const c=cat(t.kind,t.cat);
+  const tm=t.recur?t:t.recurOf?S.tx.find(x=>x.id===t.recurOf&&x.recur):null;
   open(`<h3>${c.ic} ${esc(t.note||c.n)}</h3><div class="big num ${t.kind==='in'?'in':'out'}" style="font-size:34px;font-weight:700">${fmt(t.kind==='in'?t.amt:-t.amt,true)}</div>
-  <div style="margin:14px 0"><div class="stat"><span>Kateqoriya</span><b>${esc(c.n)}</b></div><div class="stat"><span>Tarix</span><b>${dLabel(t.date)}</b></div>${t.recur||t.recurOf?'<div class="stat"><span>Təkrar</span><b>Hər ay</b></div>':''}</div>
+  <div style="margin:14px 0"><div class="stat"><span>Kateqoriya</span><b>${esc(c.n)}</b></div><div class="stat"><span>Tarix</span><b>${dLabel(t.date)}</b></div></div>
+  ${tm?`<div class="card" style="background:var(--surface-2);margin-bottom:12px;padding:12px 14px"><div class="stat"><span>Hər ay təkrarlanır</span><b class="num">${fmt(tm.recurAmt??tm.amt)}</b></div><div class="stat"><span>Ayın günü</span><b>${parse(tm.date).getDate()}</b></div>
+  <div class="btns" style="margin-top:8px"><button class="btn" style="background:var(--surface);height:44px;font-size:15px" data-act="recamt:${tm.id}">Məbləği dəyiş</button><button class="btn" style="background:var(--surface);height:44px;font-size:15px;color:var(--expense)" data-act="stoprecur:${tm.id}">Dayandır</button></div></div>`:''}
   ${t.adj?'':`<button class="btn primary" style="width:100%;margin-bottom:8px" data-act="edittx:${t.id}">Düzəlt</button>`}
-  ${t.recur?`<button class="btn" style="width:100%;margin-bottom:8px" data-act="stoprecur:${t.id}">Təkrarı dayandır</button>`:''}
   <button class="btn danger" style="width:100%" data-act="dodeltx:${t.id}">Bu qeydi sil</button>`);
 }
 function debtForm(pre){
@@ -517,16 +529,17 @@ function debtDetail(id){
   open(`<h3>${esc(d.name)}</h3><div class="k">${d.dir==='in'?'Mənə borcludur':'Mən borcluyam'}${d.note?' · '+esc(d.note):''}</div>
   <div class="num" style="font-size:34px;font-weight:700;margin-top:6px;color:${isOpen(d)?(d.dir==='in'?'var(--debt)':'var(--expense)'):'var(--income)'}">${isOpen(d)?fmt(left):'Bağlanıb ✓'}</div>
   <div style="margin:10px 0 16px"><div class="stat"><span>Ümumi borc</span><b class="num">${fmt(debtLoan(d))}</b></div><div class="stat"><span>Qaytarılıb</span><b class="num in">${fmt(debtPaid(d))}</b></div>${d.due?`<div class="stat"><span>Qaytarma tarixi</span><b>${dLabel(d.due)}</b></div>`:''}</div>
-  <form data-form="debtop" data-id="${d.id}">${amountField(isOpen(d)?String(left).replace('.',','):'0')}<label class="toggle"><input type="checkbox" name="astx" id="f-astx" checked>${d.dir==='in'?'Ödənişi gəlir kimi də yaz (balansa əlavə olunsun)':'Ödənişi xərc kimi də yaz (balansdan çıxılsın)'}</label>
+  <form data-form="debtop" data-id="${d.id}">${amountField(isOpen(d)?String(left).replace('.',','):'0')}<label class="field">Tarix<input type="date" id="f-opdate" name="opdate" value="${TODAY}" max="${TODAY}" required></label><label class="toggle"><input type="checkbox" name="astx" id="f-astx" checked>${d.dir==='in'?'Ödənişi gəlir kimi də yaz (balansa əlavə olunsun)':'Ödənişi xərc kimi də yaz (balansdan çıxılsın)'}</label>
   <div class="btns"><button class="btn primary" name="op" value="pay" ${isOpen(d)?'':'disabled'}>Ödəniş əlavə et</button><button class="btn" name="op" value="loan">${d.dir==='in'?'Yenə borc ver':'Yenə borc al'}</button></div></form>
-  <h2>Tarixçə</h2><div>${ops.map(o=>`<div class="row"><span class="tile">${o.type==='loan'?'↗':'↙'}</span><span class="mid"><div class="t">${o.type==='loan'?(d.dir==='in'?'Borc verdim':'Borc aldım'):(d.dir==='in'?'Qaytardı':'Qaytardım')}</div><div class="s">${dLabel(o.date)}</div></span><span class="a num ${o.type==='pay'?'in':''}">${fmt(o.amt)}</span></div>`).join('')}</div>
+  <h2>Tarixçə</h2><div>${ops.map(o=>`<div class="row"><span class="tile">${o.type==='loan'?'↗':'↙'}</span><span class="mid"><div class="t">${o.type==='loan'?(d.dir==='in'?'Borc verdim':'Borc aldım'):(d.dir==='in'?'Qaytardı':'Qaytardım')}</div><div class="s">${dLabel(o.date)}${o.note?' · '+esc(o.note):''}</div></span><span class="a num ${o.type==='pay'?'in':''}">${fmt(o.amt)}</span></div>`).join('')}</div>
   <button class="btn danger" style="width:100%;margin-top:10px" data-act="deldebt:${d.id}">Bu borcu sil</button>`);
 }
-function jarForm(){
-  open(`<h3>Yeni qutu</h3><form data-form="jar"><label class="field">Ad<input id="f-name" name="name" required placeholder="məs. Maşın" maxlength="30" autofocus></label>
-  <div class="chips">${JAR_IC.map((ic,i)=>`<label class="chip"><input type="radio" name="ic" value="${ic}" ${i===0?'checked':''}><span style="font-size:20px;padding:6px 10px">${ic}</span></label>`).join('')}</div>
-  <div class="grid2"><label class="field">Məqsəd (₼)<input id="f-goal" name="goal" inputmode="decimal" placeholder="İstəyə bağlı"></label><label class="field">Hədəf tarixi<input type="date" id="f-due" name="due" min="${TODAY}"></label></div>
-  <button class="btn primary">Qutunu yarat</button></form>`);
+function jarForm(j){
+  open(`<h3>${j?'Qutunu düzəlt':'Yeni qutu'}</h3><form data-form="jar" ${j?`data-id="${j.id}"`:''}><label class="field">Ad<input id="f-name" name="name" required placeholder="məs. Maşın" maxlength="30" value="${esc(j?j.name:'')}" ${j?'':'autofocus'}></label>
+  <div class="chips">${(j&&!JAR_IC.includes(j.ic)?[j.ic,...JAR_IC]:JAR_IC).map((ic,i)=>`<label class="chip"><input type="radio" name="ic" value="${ic}" ${(j?ic===j.ic:i===0)?'checked':''}><span style="font-size:20px;padding:6px 10px">${ic}</span></label>`).join('')}</div>
+  <div class="grid2"><label class="field">Məqsəd (₼)<input id="f-goal" name="goal" inputmode="decimal" placeholder="İstəyə bağlı" value="${j&&j.goal?String(j.goal).replace('.',','):''}"></label><label class="field">Hədəf tarixi<input type="date" id="f-due" name="due" value="${j?j.due||'':''}"></label></div>
+  ${j?'<div class="k" style="font-weight:400">Məqsədi silmək üçün sahəni boş saxla.</div>':''}
+  <button class="btn primary">${j?'Yadda saxla':'Qutunu yarat'}</button></form>`);
 }
 function jarDetail(id){
   const j=S.jars.find(x=>x.id===id);if(!j)return;const s=jarSum(j);
@@ -534,7 +547,8 @@ function jarDetail(id){
   ${j.goal?`<div class="k" style="margin-top:4px">Məqsəd: ${fmt(j.goal)} · ${Math.round(s/j.goal*100)}%</div><div class="track" style="margin-top:10px"><div class="fill" style="width:${Math.min(s/j.goal,1)*100}%;background:var(--save)"></div></div><div class="advice" style="margin-top:10px;font-size:13px;color:var(--muted)">${jarAdvice(j)}</div>`:''}
   <form data-form="jarop" data-id="${j.id}" style="margin-top:16px">${amountField()}<div class="btns"><button class="btn primary" name="op" value="put">Pul qoy</button><button class="btn" name="op" value="take">Pul götür</button></div><div class="k" style="font-weight:500">Qoyduğun pul balansdan çıxılır, götürdüyün pul balansa qayıdır.</div></form>
   <h2>Tarixçə</h2><div>${[...j.ops].sort((a,b)=>b.date.localeCompare(a.date)).map(o=>`<div class="row"><span class="tile">${o.amt>0?'↓':'↑'}</span><span class="mid"><div class="t">${o.amt>0?'Qoydum':'Götürdüm'}</div><div class="s">${dLabel(o.date)}</div></span><span class="a num ${o.amt>0?'sav':''}">${fmt(o.amt,true)}</span></div>`).join('')||'<div class="empty">Hələ əməliyyat yoxdur.</div>'}</div>
-  <button class="btn danger" style="width:100%;margin-top:10px" data-act="deljar:${j.id}">Qutunu sil</button>`);
+  <button class="btn" style="width:100%;margin-top:10px" data-act="editjar:${j.id}">Qutunu düzəlt</button>
+  <button class="btn danger" style="width:100%;margin-top:4px" data-act="deljar:${j.id}">Qutunu sil</button>`);
 }
 function jarQuick(){
   if(!S.jars.length){jarForm();return}
@@ -562,7 +576,8 @@ function settings(){
   <div class="seg seg3" role="group">${[['auto','Avtomatik'],['light','Açıq'],['dark','Tünd']].map(([k,l])=>`<button data-act="theme:${k}" aria-pressed="${t===k}">${l}</button>`).join('')}</div>
   <div class="k" style="font-weight:400;margin-top:8px">Avtomatik rejimdə telefonun öz ayarına uyğun dəyişir.</div>
   <h2>Balans</h2>
-  <div>${setRow('balance','scale','var(--income)','Balansı düzəlt','Tətbiqdəki balansı real pula uyğunlaşdır')}</div>
+  <div>${setRow('balance','scale','var(--income)','Balansı düzəlt','Tətbiqdəki balansı real pula uyğunlaşdır')}
+  ${setRow('recurs','repeat','var(--save)','Təkrarlanan ödənişlər',(()=>{const n=S.tx.filter(x=>x.recur).length;return n?n+' aktiv':'Yoxdur'})())}</div>
   <h2>Nüsxə</h2>
   <div>${setRow('export','down','var(--accent)','Ehtiyat nüsxə al',lb?'Son nüsxə: '+dLabel(lb):'Hələ nüsxə alınmayıb')}
   ${setRow('','up','var(--save)','Nüsxədən geri yüklə','Əvvəl saxladığın fayldan','<input type="file" id="f-import" class="vh" accept=".json,application/json">')}
@@ -624,6 +639,17 @@ function balanceForm(){
   ${first?'':`<div class="k" style="font-weight:400">Tətbiqdə indi: <b class="num">${fmt(T.bal)}</b></div>`}
   <button class="btn primary">Yadda saxla</button></form>`);
 }
+function recurList(){
+  const list=S.tx.filter(t=>t.recur);
+  open(`<h3>Təkrarlanan ödənişlər</h3><div class="k" style="font-weight:400;line-height:1.45">Maaş, kirayə kimi hər ay avtomatik yazılan qeydlər. Dəyişmək və ya dayandırmaq üçün toxun.</div>
+  <div style="margin-top:8px">${list.map(t=>{const c=cat(t.kind,t.cat);const a=(t.kind==='in'?1:-1)*(t.recurAmt??t.amt);return `<button class="row" data-act="tx:${t.id}"><span class="tile" style="${tint(c.c)}">${c.ic}</span><span class="mid"><div class="t">${esc(t.note||c.n)}</div><div class="s">${t.kind==='in'?'Gəlir':'Xərc'} · hər ayın ${parse(t.date).getDate()} günü</div></span><span class="a num ${a>0?'in':''}">${fmt(a,true)}</span></button>`}).join('')||'<div class="empty">Təkrarlanan qeyd yoxdur. Gəlir və ya xərc əlavə edəndə “Hər ay təkrarla” seç.</div>'}</div>`);
+}
+function recAmtForm(id){
+  const t=S.tx.find(x=>x.id===id);if(!t)return;
+  open(`<h3>Aylıq məbləğ</h3><form data-form="recamt" data-id="${t.id}">${amountField('',t.recurAmt??t.amt)}
+  <div class="k" style="font-weight:400;line-height:1.45">Yeni məbləğ növbəti dəfədən yazılacaq. Əvvəlki aylardakı qeydlər dəyişmir.</div>
+  <button class="btn primary">Yadda saxla</button></form>`);
+}
 function allFeed(){
   const f=feed();let h='',last='';
   f.forEach(x=>{if(x.date!==last){h+=`<div class="daylbl">${dLabel(x.date)}</div>`;last=x.date}h+=rowHTML(x)});
@@ -646,6 +672,10 @@ document.addEventListener('click',e=>{
     case 'jar':jarDetail(b);break;
     case 'limit':limitForm(b);break;
     case 'all':allFeed();break;
+    case 'hide':{const on=!hidden();document.documentElement.classList.toggle('priv',on);try{localStorage.setItem('kassa.hide',on?'1':'0')}catch(e){}render();break}
+    case 'editjar':{const j=S.jars.find(x=>x.id===b);if(j)jarForm(j);break}
+    case 'recurs':recurList();break;
+    case 'recamt':recAmtForm(b);break;
     case 'balance':balanceForm();break;
     case 'balok':S.balanceSet=true;save();render();break;
     case 'edittx':{const t=S.tx.find(x=>x.id===b);if(t)txForm(t.kind,t);break}
@@ -700,6 +730,7 @@ document.addEventListener('submit',e=>{
     if(Math.abs(diff)>=0.01)S.tx.push({id:uid(),kind:diff>0?'in':'out',amt:Math.abs(diff),cat:'adj',adj:true,date:TODAY,note:'Balans düzəlişi',recur:false});
     save();close();render();toast(Math.abs(diff)>=0.01?'Balans düzəldildi':'Balans artıq düzgündür');return}
   if(type!=='jar'&&type!=='limit'&&!(amt>0)){toast('Məbləği yaz');return}
+  if(type==='recamt'){const t=S.tx.find(x=>x.id===f.dataset.id);if(t)t.recurAmt=amt;save();close();render();toast('Aylıq məbləğ dəyişdi');return}
   if(type==='tx'&&f.dataset.id){const t=S.tx.find(x=>x.id===f.dataset.id),kind=t.kind,c=fd.get('cat');
     const oldD=t.debtId?S.debts.find(x=>x.id===t.debtId):null,oldOp=oldD?oldD.ops.find(o=>o.txId===t.id):null;
     const d=c===DEBT_CAT[kind]&&fd.get('debt')?S.debts.find(x=>x.id===fd.get('debt')):null;
@@ -717,14 +748,16 @@ document.addEventListener('submit',e=>{
     const k=f.dataset.kind;mOff[k]=0;toast(k==='in'?'Gəlir əlavə olundu':'Xərc əlavə olundu')}
   else if(type==='debt'){const dir=fd.get('dir'),name=(fd.get('name')||'').trim(),date=fd.get('date')||TODAY;
     let d=S.debts.find(x=>x.dir===dir&&x.name.toLowerCase()===name.toLowerCase()&&isOpen(x));
-    if(d){d.ops.push({type:'loan',amt,date});if(fd.get('due'))d.due=fd.get('due')}
+    const nt=(fd.get('note')||'').trim();
+    if(d){d.ops.push({type:'loan',amt,date,note:nt});if(!d.note&&nt)d.note=nt;if(fd.get('due'))d.due=fd.get('due')}
     else S.debts.push({id:uid(),dir,name,due:fd.get('due')||'',note:(fd.get('note')||'').trim(),ops:[{type:'loan',amt,date}]});
     debtDir=dir;toast(d?'Borc karta əlavə olundu':'Borc yazıldı')}
   else if(type==='debtop'){const d=S.debts.find(x=>x.id===f.dataset.id);const o=op||'pay';
     if(o==='pay'&&amt>debtLeft(d)+0.004){toast('Qalıqdan çox ola bilməz');return}
-    const op={type:o,amt,date:TODAY};
-    if(o==='pay'&&fd.get('astx')){const kind=d.dir;const t={id:uid(),kind,amt,cat:DEBT_CAT[kind],date:TODAY,note:kind==='in'?d.name+' borcu qaytardı':d.name+' adlı şəxsə borc ödənişi',recur:false,debtId:d.id};S.tx.push(t);op.txId=t.id}
-    d.ops.push(op);toast(o==='pay'?(isOpen(d)?'Ödəniş yazıldı':'Borc bağlandı ✓'):'Borc artırıldı')}
+    const dt=fd.get('opdate')||TODAY;const rec={type:o,amt,date:dt};
+    if(o==='pay'&&fd.get('astx')){const kind=d.dir;const t={id:uid(),kind,amt,cat:DEBT_CAT[kind],date:dt,note:kind==='in'?d.name+' borcu qaytardı':d.name+' adlı şəxsə borc ödənişi',recur:false,debtId:d.id};S.tx.push(t);rec.txId=t.id}
+    d.ops.push(rec);toast(o==='pay'?(isOpen(d)?'Ödəniş yazıldı':'Borc bağlandı ✓'):'Borc artırıldı')}
+  else if(type==='jar'&&f.dataset.id){const j=S.jars.find(x=>x.id===f.dataset.id);Object.assign(j,{name:(fd.get('name')||'').trim()||j.name,ic:fd.get('ic')||j.ic,goal:num(fd.get('goal')),due:fd.get('due')||''});toast('Qutu yeniləndi')}
   else if(type==='jar'){S.jars.push({id:uid(),name:(fd.get('name')||'').trim(),ic:fd.get('ic'),goal:num(fd.get('goal')),due:fd.get('due')||'',ops:[]});toast('Qutu yaradıldı')}
   else if(type==='jarop'||type==='jarquick'){const j=S.jars.find(x=>x.id===(f.dataset.id||fd.get('jar')));const take=op==='take';
     if(take&&amt>jarSum(j)+0.004){toast('Qutuda bu qədər pul yoxdur');return}
